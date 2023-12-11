@@ -1,2 +1,261 @@
-fn main
-let x = 10;
+# this is a comment
+# comments start with a # and go until the end of the line (similar to python)
+# you can also make docstrings like this
+"""
+this is a docstring
+it can span multiple lines and is used for documentation
+
+docstrings use the same syntax as string literals (meaning that you can also use one double quotation mark instead of 3), 
+and even evaluate to a string literal. the only difference is that it is typically not assigned to a variable
+
+docstrings are not required to be at the top of a file, before a function, before a type, or before a variable, but it is recommended
+"""
+
+# you can import C++ libraries like this:
+import extern CPP <map>;
+
+use namespace std; # allows you to use the std namespace without having to type std:: every time
+
+# you can also import C libraries like this:
+import extern C <stdio.h>;
+
+# finally, you can import other bp files like this:
+mod other_file; # this will import either ./other_file.bp or ./other_file/mod.bp (similar to how rust does it)
+
+# after importing a file, you can use it like this:
+use other_file::other_func; # this will allow you to use other_func without having to type other_file::other_func every time
+
+# you can also import all of the functions, types, and global variables from a file like this:
+# use other_file::*; # this will import all of the functions, types, and global variables from other_file
+# this is not recommended as it can cause name collisions and makes it harder to tell where a function is coming from
+# but it can be useful when you are importing a lot of functions from a file or are just making a quick script and don't care about name collisions
+
+# if you want to import a file, but it is in a different directory, you can do this:
+# `mod other_file: ./other_dir/other_file.bp;`
+# this is considered bad practice as it can result in the same file being imported multiple times, but it is there if you want it
+#
+# or, if you have already imported in with `mod` in another file, you can do this:
+# `use project::other_file::other_func;`
+#
+# this is designed to be similar to how rust does it
+
+"""
+# This is an example docstring
+# you can put comments in docstrings and they will be ignored by the documenation generator
+
+@summary: this struct is used to represent a rigid body in 3d space
+
+@fields: {
+	@pos: the position of the rigid body
+	@rot: the rotation of the rigid body represented as a rotation matrix
+	@vel: the velocity of the rigid body
+	@rot_vel: the rotational velocity of the rigid body represented as the angular velocity vector
+	@mass: the mass of the rigid body
+	@moment: the inertia tensor of the rigid body represented as a 3x3 matrix
+}
+"""
+struct RigidBody {
+	pub pos: [f32; 3],
+	pub rot: [f32; 3, 3],
+	pub vel: [f32, 3],
+	pub rot_vel: [f32; 3, 3],
+	pub mass: f32,
+	pub moment: [f32; 3, 3],
+}
+
+# you can run have code outside of a function, which will run before the main function in the main file
+# or on import if it is in a different file
+# generally speaking, this should be used exclusively for global variables and constants
+# but if you really want to, you can put any code here
+#
+# again, I would like to stress that this is generally considered bad practice and should be avoided
+# but it is there if you want it
+#
+# for an example you can do this:
+let foo = comp |4, 4|: ![f32; 4, 4] {
+	fn execute(i: u32, j: u32) {
+		(i * j) as f32 # generates a 4x4 matrix with the value of i * j at each index (i and j are within the range 0..4, not 1..5)
+	}
+};
+# which does everything from loading and compiling the generated file, to making heap allocations outside of a function
+# an important thing to note is that, if you configure your gpu in the main function, this will run prior to that and very well may crash your program
+# because of this, if you decide to do this for some reason, you should configure your gpu at the top of the file (before the rest of the global code)
+#
+# also, you should absolutely never configure your gpu in the global code of any file other than the main file to avoid configuration conflicts
+# if you want to configure your gpu in a different file, you should do it in a function and call that function from the main file
+# and if you are making a library, you should only ever allow the user to configure the gpu through a function call to a 
+# function that explicitly mentions that it configures the gpu in at least the docstring, if not the name of the function itself
+#
+# ie: if you do have a function that configures the gpu, it should be called something like this:
+"
+@summary: configures the gpu
+"
+fn configure_gpu() {
+	# code to configure the gpu
+}
+
+# similar result types as in Zig, uses try syntax to pull just ok types out of a result type
+# you do not typically have a docstring for the entry point of a program, but you can if you want
+fn main(): !u8 { #entry point of program, error type is automatically converted to -1 to allow for easier error handling in main
+	let i: i16 = 10; #makes an immutable assignment
+	println "int: " + i;
+
+	let j: i16 = i * 2;
+	tabiffy 1; #indents the next line by 1 tab (4 spaces) (used for formatting output)
+	println "times two: " + j;
+	tabiffy -1; #unindents the next line by 1 tab
+
+	let vec: [f32; 3] = |0, 1, 2|; #creates a 3-component vector
+	println "Vec: " + vec;
+
+	let mat: [f32; 4, 4] = |1, 0, 0, 0,, #creates a 4x4 matrix (the double commas are used to separate rows)/
+			    	0, 1, 0, 0,, #unless it is alloced, all matrices are on the stack
+			    	0, 0, 1, 0,,
+			    	0, 0, 0, 1|
+	println "Mat: " + mat;
+	
+	let k = other_func(i); #calls other_func with i as a parameter and assigns the returned value to k (type inference)
+	
+	println "Returned Value: " + i;
+	
+	var rb = alloc RigidBody { #allocs a RigidBody struct returning a mutable pointer to it
+		pos: |0, 0, 0|,
+		rot: |0, 0, 0|,
+		vel: |0, 0, 0|,
+		rot_vel: |0, 0, 0|,
+		mass: 0,
+		moment: |1, 0, 0,,
+			 0, 1, 0,,
+			 0, 0, 1|
+	}
+	defer free rb; #frees rb at end of scope
+
+	# if you don't want to have the struct on the stack ever, you can do this:
+	# var rb = alloc RigidBody;
+	# rb.pos = |0, 0, 0|;
+	# rb.rot = |0, 0, 0|; ...
+	# or
+	# var rb: RigidBody = alloc [f32; 22]; #allocs a 22 element array of f32s and casts it to a RigidBody
+	# or even
+	# var rb: RigidBody = alloc 704 as usize; #allocs 704 bytes and casts it to a RigidBody
+	# it just allocs the memory of that size and returns a pointer to it with the type of the struct
+	# this is useful for when you want to have a struct on the heap but don't want to have to initialize it
+	# this can also be done with arrays and other types
+	# you can even do this:
+	# var rb: RigidBody = alloc 1000 as usize;
+	# here, rb is a pointer to 1000 bytes of memory, but it's first 704 bytes is still a RigidBody
+	
+	# if you really want to, you can do this:
+	# var rb: RigidBody = alloc 500 as usize;
+	# but this will cause a segfault if you try to access any of the fields of rb past the 500th byte
+	
+	# creates a compute shader, compiles it, and loads it onto the gpu
+	# every shader either has a return type of ![some type, n] or [!some type; n]
+	# the former is a result wrapped around buffer of n elements of type some type
+	# the latter is a buffer of n elements of of a result wrapped around some type type
+	
+	# under the hood, the shader is converted to WGSL and then is JITC
+	# this is done for wasm compatibility and to allow for easy cross-compilation
+	
+	# syntax for shader declaration:
+	# let [shader_name] = [shader_type] |[size]|: ![output type; [size]]
+	# ie:
+	let one_plus_one = comp |1|: ![f32; 1] { 
+		uni foo: [f32; 4, 4]; # uniform variables can be passed in as parameters
+		buf bar: [f32; 100]; # buffer variables can be passed in as parameters as well
+		
+		fn execute(i: u32) { # i, j, and k all refer to indices in dispatching
+			var val = 1 + 1;
+			val #fills the index of the return array with the returned value of this function
+		}
+	}(foo); # formats how to handle function call like syntax
+	
+	one_plus_one.open(); # opens the shader for use
+
+	let matrix_a = |1, 0, 0, 0,,
+			0, 1, 0, 0,,
+			0, 0, 1, 0,,
+			0, 0, 0, 1|;
+	
+	# if you don't want to have to pass in a new buffer or uniform every time you call a shader, you can do this:
+	one_plus_one.bar = [0; 100]; # sets all elements of bar to 0 
+
+	let shader_ret = try one_plus_one(matrix_a); # comp shaders can be treated like functions
+	# try syntax is used to pull just the ok type from the result type
+	let num = shader_ret[0]; # shader_ret is a [f32; 1] because the shader returns a single f32
+
+	assert num == 2; # assert is used to check if a condition is true, if not, it panics
+
+	let res_mat = mat * matrix_a; # matrix multiplication is done with the * operator
+	assert res_mat == matrix_a; # assert is used to check if a condition is true, if not, it panics
+
+	let res_dot = |0, 0, 1| * |0, 1, 0|; # dot product is done with the * operator
+	assert res_dot == 0;
+
+	let res_cross = |0, 0, 1| x |0, 1, 0|; # cross product is done with the x operator 
+	# because of this, x is a reserved identifier and cannot be used as a variable name
+	assert res_cross == |1, 0, 0|;
+
+	let m: map<i16, f32> = {}; # equivalent to `unordered_map<i16, f32> map = {};` in C++
+	defer free map; # free calls the destructor of C++ objects
+
+	m.insert({ 0, 1.0 }); # inserts 1.0 into map with key 0
+	m.insert({ 1, 2.0 }); # inserts 2.0 into map with key 1
+	m.insert({ 2, 3.0 }); # inserts 3.0 into map with key 2
+
+	assert m[0] == 1.0; 
+	assert m[1] == 2.0; 
+	assert m[2] == 3.0; 
+
+	return 0; # returns 0 to the OS like in C
+}
+"""
+# this is an example of a docstring for a function
+@summary: this function casts a 16-bit integer to a 32-bit float
+@params: {
+	@param: the 16-bit integer to cast
+}
+@return: the 32-bit float that i16 was cast to
+"""
+fn other_func(param: i16): f32 {
+	return param as f32; #casts param to 32-bit float
+}
+
+# header files are not needed in this language as the compiler will automatically generate them
+# this is done by parsing the source code and generating a header file with all public declarations
+# the header file also contains the docstrings of all public declarations with them which can be used by IDEs
+#
+# the format of the header file is as follows:
+#
+# "
+# docstring
+# "
+# fn [name]([param name]: [param type], ...): [return type]; @[address of function]
+#
+# the header file is generated in the same directory as the source file with the same name as the source file except with a .bph extension; ie: main.bph
+# the header file is generated every time the source file is compiled along with the object file with a .bpo extension; ie: main.bpo
+#
+# the final step of compilation is to link all the object files together into a single executable
+#
+# to do all of this with a single command, you can run the following command:
+# `bp build` or equivalently `bp b`
+# if you want to run the executable after it is built, you can run the following command:
+# `bp run` or equivalently `bp r`
+#
+# running the following command will generate documentation for a library written in this language:
+# `bp gendocsite -h path/to/project/dir/with/generated/headers -o path/to/output/dir -n [name of library]`
+# this generates a simple page website with all the docstrings of all public declarations in the format of a series of html files
+# this site also contains a search bar which can be used to search for a specific declaration by name
+#
+# this is done in order to make the language more accessible to new users and to give a standard method of making good documentation for libraries written in this language
+#
+# beyond this, the bp cli will have a standard build system and package manager inspired by cargo
+#
+# to publish a library, you can run the following command:
+# `bp publish -a [address of the git repository] -n [name of library] -v [version number]`
+#
+# to add a library to your project, you can run the following command:
+# `bp add -n [name of library] -v [version number]`
+# here, version number is optional and if not specified, the latest version will be added
+# this will add the library to the project directory and add it to the list of dependencies in the bp.toml file
+#
