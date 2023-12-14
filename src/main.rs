@@ -13,6 +13,8 @@ fn main() {
             println!("{:?}", tokens);
             
             let ast = syntax_tree_gen::gen_ast(tokens);
+
+            println!("{:?}", ast);
         }
         _ => {
             println!("Unknown command: {}", args[0]);

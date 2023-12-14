@@ -53,90 +53,109 @@ fn node_from_keyword (
     kw: &Keyword,
 ) -> Option<Node> {
     match kw {
-        Keyword::FN => {
-            *i += 1;
-            let ident = match &toks[*i] {
-                Token::Ident(ident) => ident,
-                _ => panic!("Expected identifier after fn keyword"),
-            };
-            
-            *i += 1;
-            let args = match &toks[*i] {
-                Token::Delimiter(del) => {
-                    match del {
-                        Delimiter::OpenParen => {
-                            let mut v = Vec::new();
+        Keyword::FN => get_fn_node(toks, i),
+        _ => panic!("Unexpected keyword: {:?}", kw),
+    }
+}
 
-                            loop {
-                                *i += 1;
-                                match &toks[*i] {
-                                    Token::Delimiter(del) => {
-                                        match del {
-                                            Delimiter::CloseParen => break,
-                                            Delimiter::Comma => continue,
+fn get_fn_node(
+    toks: &Vec<Token>,
+    i: &mut usize,
+) -> Option<Node> {
+    *i += 1;
+    let ident = match &toks[*i] {
+        Token::Ident(ident) => ident,
+        _ => panic!("Expected identifier after fn keyword"),
+    };
+    
+    *i += 1;
+    let args = get_fn_args(toks, i);
+    *i += 1;
 
-                                            _ => panic!("Expected parentheses or comma"),
-                                        }
-                                    },
-                                    Token::Ident(ident) => {
-                                        *i += 1;
-                                        match &toks[*i] {
-                                            Token::Delimiter(del) => {
-                                                match del {
-                                                    Delimiter::Colon => {
-                                                        *i += 1;
-
-                                                        v.push((ident.clone(), get_type(toks, i)));
-                                                    },
-                                                    Delimiter::Comma => {
-                                                        v.push((ident.clone(), Type::Infer));
-                                                    },
-                                                    _ => panic!("Expected parentheses or comma"),
-                                                }
-                                            },
-                                            _ => panic!("Expected identifier"),
-                                        }
-
-                                    },
-                                    _ => panic!("Expected identifier"),
-                                }
-                            }
-
-                            v
-                        },
-                        _ => panic!("Expected parentheses after fn identifier"),
-                    }
+    let return_type = match &toks[*i] {
+        Token::Delimiter(del) => {
+            match del {
+                Delimiter::Colon => {
+                    *i += 1;
+                    get_type(toks, i)
                 },
-                _ => panic!("Expected parentheses after fn identifier"),
-            };
+                _ => panic!("Expected colon after fn arguments"),
+            }
+        },
+        _ => panic!("Expected colon after fn arguments"),
+    };
 
+    *i += 1;
+
+    let scope = Box::new(get_scope(toks, i));
+
+    Some(Node::Statement(Statement::Function {
+        ident: ident.clone(),
+        args,
+        return_type,
+        scope,
+    }))
+}
+
+fn get_fn_args(
+    toks: &Vec<Token>,
+    i: &mut usize,
+) -> Vec<(String, Type)> {
+    assert_eq!(toks[*i], Token::Delimiter(Delimiter::OpenParen),
+               "Expected open paren after fn identifier");
+
+    let mut v = Vec::new();
+
+    loop {
+        match get_next_arg(toks, i) {
+            Ok((ident, type_)) => {
+                v.push((ident, type_));
+            },
+            Err(is_comma) => {
+                if is_comma { continue; } //this was a comma, so there's another arg
+                else { break; } //this was a close paren, so we're done
+            },
+        }
+    }
+
+    v
+}
+
+fn get_next_arg(
+    toks: &Vec<Token>,
+    i: &mut usize,
+) -> Result<(String, Type), bool> {
+    *i += 1;
+    match &toks[*i] {
+        Token::Delimiter(del) => {
+            match del {
+                Delimiter::CloseParen => Err(false),
+                Delimiter::Comma => Err(true),
+
+                _ => panic!("Expected parentheses or comma"),
+            }
+        },
+        Token::Ident(ident) => {
             *i += 1;
-
-            let return_type = match &toks[*i] {
+            match &toks[*i] {
                 Token::Delimiter(del) => {
                     match del {
                         Delimiter::Colon => {
                             *i += 1;
-                            get_type(toks, i)
+
+                            Ok((ident.clone(), get_type(toks, i)))
                         },
-                        _ => panic!("Expected colon after fn arguments"),
+                        Delimiter::Comma => {
+                            Ok((ident.clone(), Type::Infer))
+                        },
+                        _ => panic!("Expected parentheses or comma"),
                     }
                 },
-                _ => panic!("Expected colon after fn arguments"),
-            };
+                _ => panic!("Expected identifier"),
+            }
 
-            *i += 1;
-
-            let scope = get_scope(toks, i);
-
-            Some(Node::Statement(Statement::Function {
-                ident: ident.clone(),
-                args,
-                return_type,
-                scope,
-            }))
         },
-        _ => panic!("Unexpected keyword: {:?}", kw),
+        _ => panic!("Expected identifier"),
     }
 }
 
@@ -171,15 +190,17 @@ fn node_from_delimiter(
     del: &Delimiter,
 ) -> Option<Node> {
     match del {
-
+        Delimiter::OpenCurly => Some(Node::Scope(get_scope(toks, i))),
         _ => panic!("Unexpected delimiter: {:?}", del),
     }
 }
 
+#[derive(Debug)]
 pub struct AbstractSyntaxTree {
     nodes: Vec<Node>,
 }
 
+#[derive(Debug)]
 pub enum Type {
     Infer, //The type needs to be inferred by the semantic analyzer
     Ident(String),
@@ -223,6 +244,7 @@ pub enum Type {
     },
 }
 
+#[derive(Debug)]
 pub enum Expr {
     Ident(String),
     Literal(Literal),
@@ -286,6 +308,7 @@ pub enum Expr {
     },
 }
 
+#[derive(Debug)]
 pub enum Operation {
     Add,
     Sub,
@@ -309,36 +332,37 @@ pub enum Operation {
     GreaterThanOrEqual,
 }
 
+#[derive(Debug)]
 pub enum Statement {
     Assert {
-        expr: Expr,
+        expr: Box<Expr>,
     },
 
     //Assignments
     Assign {
         ident: String,
-        expr: Expr,
+        expr: Box<Expr>,
     },
     AssignWithOp {
         ident: String,
         op: Operation,
-        expr: Expr,
+        expr: Box<Expr>,
     },
 
     //Declarations
     Var {
         ident: String,
-        expr: Expr,
+        expr: Box<Expr>,
     },
     Const {
         ident: String,
-        expr: Expr,
+        expr: Box<Expr>,
     },
     Function {
         ident: String,
         args: Vec<(String, Type)>,
         return_type: Type,
-        scope: Scope,
+        scope: Box<Scope>,
     },
     ExternFunction {
         ident: String,
@@ -347,18 +371,15 @@ pub enum Statement {
     },
     ExternVar {
         ident: String,
-        expr: Expr,
+        expr: Box<Expr>,
     },
     ExternConst {
         ident: String,
-        expr: Expr,
+        expr: Box<Expr>,
     },
     ExternType {
         ident: String,
     },
-
-
-    //Memory structures
     Struct {
         //TODO
     },
@@ -368,41 +389,45 @@ pub enum Statement {
     
     //Control Flow
     Loop {
-        scope: Scope,
+        scope: Box<Scope>,
     },
     While {
-        scope: Scope,
-        condition: Expr,
+        scope: Box<Scope>,
+        condition: Box<Expr>,
     },
     If {
-        scope: Scope,
-        condition: Expr,
+        scope: Box<Scope>,
+        condition: Box<Expr>,
         else_scope: Option<Scope>,
     },
     CStyleFor {
-        scope: Scope,
+        scope: Box<Scope>,
         declarer: Box<Statement>,
-        condition: Expr,
+        condition: Box<Expr>,
         iterator: Box<Statement>,
     },
     IteratorFor {
-        scope: Scope,
-        iterator: Expr,
+        scope: Box<Scope>,
+        iterator: Box<Expr>,
         varident: String,
     },
     Panic {
-        message: Expr,
+        message: Box<Expr>,
     },
     Break,
     Continue,
-    Return,
+    Return {
+        return_val: Box<Expr>,
+    },
 }
 
+#[derive(Debug)]
 pub struct Scope {
     nodes: Vec<Node>,
     defered_statements: Vec<(usize /*index of node where it's defered*/, Statement)>,
 }
 
+#[derive(Debug)]
 pub enum Node {
     Statement(Statement),
     Expr(Expr),

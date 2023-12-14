@@ -1,7 +1,7 @@
 # this is a comment
 # comments start with a # and go until the end of the line (similar to python)
 # you can also make docstrings like this
-"""
+"
 this is a docstring
 it can span multiple lines and is used for documentation
 
@@ -9,7 +9,7 @@ docstrings use the same syntax as string literals (meaning that you can also use
 and even evaluate to a string literal. the only difference is that it is typically not assigned to a variable
 
 docstrings are not required to be at the top of a file, before a function, before a type, or before a variable, but it is recommended
-"""
+"
 
 # you can import C++ libraries like this:
 import extern CPP <map>;
@@ -39,7 +39,7 @@ use other_file::other_func; # this will allow you to use other_func without havi
 #
 # this is designed to be similar to how rust does it
 
-"""
+"
 # This is an example docstring
 # you can put comments in docstrings and they will be ignored by the documenation generator
 
@@ -53,7 +53,7 @@ use other_file::other_func; # this will allow you to use other_func without havi
 	@mass: the mass of the rigid body
 	@moment: the inertia tensor of the rigid body represented as a 3x3 matrix
 }
-"""
+"
 struct RigidBody {
 	pub pos: [f32; 3],
 	pub rot: [f32; 3, 3],
@@ -209,14 +209,14 @@ fn main(): !u8 { #entry point of program, error type is automatically converted 
 
 	return 0; # returns 0 to the OS like in C
 }
-"""
+"
 # this is an example of a docstring for a function
 @summary: this function casts a 16-bit integer to a 32-bit float
 @params: {
 	@param: the 16-bit integer to cast
 }
 @return: the 32-bit float that i16 was cast to
-"""
+"
 fn other_func(param: i16): f32 {
 	return param as f32; #casts param to 32-bit float
 }
@@ -227,9 +227,9 @@ fn other_func(param: i16): f32 {
 #
 # the format of the header file is as follows:
 #
-# "
+# """
 # docstring
-# "
+# """
 # fn [name]([param name]: [param type], ...): [return type]; @[address of function]
 #
 # the header file is generated in the same directory as the source file with the same name as the source file except with a .bph extension; ie: main.bph
