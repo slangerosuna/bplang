@@ -12,18 +12,18 @@ docstrings are not required to be at the top of a file, before a function, befor
 "
 
 # you can import C++ libraries like this:
-import extern CPP <map>;
+# import extern CPP <map>;
 
-use namespace std; # allows you to use the std namespace without having to type std:: every time
+# use namespace std; # allows you to use the std namespace without having to type std:: every time
 
 # you can also import C libraries like this:
-import extern C <stdio.h>;
+# import extern C <stdio.h>;
 
 # finally, you can import other bp files like this:
-mod other_file; # this will import either ./other_file.bp or ./other_file/mod.bp (similar to how rust does it)
+# mod other_file; # this will import either ./other_file.bp or ./other_file/mod.bp (similar to how rust does it)
 
 # after importing a file, you can use it like this:
-use other_file::other_func; # this will allow you to use other_func without having to type other_file::other_func every time
+# use other_file::other_func; # this will allow you to use other_func without having to type other_file::other_func every time
 
 # you can also import all of the functions, types, and global variables from a file like this:
 # use other_file::*; # this will import all of the functions, types, and global variables from other_file
@@ -38,6 +38,10 @@ use other_file::other_func; # this will allow you to use other_func without havi
 # `use project::other_file::other_func;`
 #
 # this is designed to be similar to how rust does it
+
+fn test_func() {
+
+}
 
 "
 # This is an example docstring

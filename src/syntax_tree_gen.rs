@@ -34,7 +34,8 @@ fn next_node(
         Token::Keyword(kw) => node_from_keyword(toks, i, kw),
         Token::Operator(op) => node_from_operator(toks, i, op),
         Token::Delimiter(del) => node_from_delimiter(toks, i, del),
-        
+        Token::Literal(lit) => node_from_literal(toks, i, lit),       
+
         _ => panic!("Unexpected token: {:?}", tok),
     }
 }
@@ -76,10 +77,9 @@ fn get_fn_node(
         Token::Delimiter(del) => {
             match del {
                 Delimiter::Colon => {
-                    *i += 1;
                     get_type(toks, i)
                 },
-                _ => panic!("Expected colon after fn arguments"),
+                _ => Type::Infer,
             }
         },
         _ => Type::Infer,
@@ -163,7 +163,72 @@ fn get_type(
     toks: &Vec<Token>,
     i: &mut usize,
 ) -> Type {
-    panic!("Not implemented"); //TODO
+    *i += 1;
+
+    match &toks[*i] {
+        Token::Ident(ident) => Type::Ident(ident.clone()),
+        Token::Primitive(type_) => Type::Primitive(type_.clone()),
+        Token::Delimiter(delim) => match delim {
+            Delimiter::OpenParen => get_tuple_type(toks, i),
+            _ => panic!("Expected type"),
+        },
+        Token::Keyword(kw) => match kw {
+            Keyword::FN => get_fn_type(toks, i),
+            //TODO: handle anonymous structs, enums, and unions
+            _ => panic!("Expected type"),
+        },
+
+        _ => panic!("Expected type"),
+    }
+}
+
+fn get_tuple_type(
+    toks: &Vec<Token>,
+    i: &mut usize,
+) -> Type {
+    let mut v = Vec::new();
+
+    loop {
+        *i += 1;
+        match &toks[*i] {
+            Token::Delimiter(Delimiter::CloseParen) => break,
+            Token::Delimiter(Delimiter::Comma) => continue,
+            _ => v.push(get_type(toks, i)),
+        }
+    }
+
+    Type::Tuple{
+        types: v,
+    }
+}
+
+fn get_fn_type(
+    toks: &Vec<Token>,
+    i: &mut usize,
+) -> Type {
+    *i += 1;
+
+    let args = get_fn_args(toks, i);
+    let args = args.into_iter().map(|(_, type_)| type_).collect();
+    *i += 1;
+
+    let return_type = match &toks[*i] {
+        Token::Delimiter(del) => {
+            match del {
+                Delimiter::Colon => {
+                    get_type(toks, i)
+                },
+                _ => Type::Infer,
+            }
+        },
+        _ => Type::Infer,
+    };
+    let return_type = Box::new(return_type);
+
+    Type::FunctionPointer {
+        args,
+        return_type,
+    }
 }
 
 fn get_scope(
@@ -178,8 +243,18 @@ fn node_from_operator(
     i: &mut usize,
     op: &Operator,
 ) -> Option<Node> {
-    match op {
+    *i += 1;
 
+    match op {
+        Operator::Asterisk => { //pointer dereference
+            panic!("Not implemented"); //TODO
+        },
+        Operator::Ampersand => { //address-of
+            panic!("Not implemented"); //TODO
+        },
+        Operator::Not => { //not
+            panic!("Not implemented"); //TODO
+        }, //TODO: Verify that there are no other unary operators
         _ => panic!("Unexpected operator: {:?}", op),
     }
 }
@@ -193,6 +268,16 @@ fn node_from_delimiter(
         Delimiter::OpenCurly => Some(Node::Scope(get_scope(toks, i))),
         _ => panic!("Unexpected delimiter: {:?}", del),
     }
+}
+
+fn node_from_literal(
+    toks: &Vec<Token>,
+    i: &mut usize,
+    lit: &Literal,
+) -> Option<Node> {
+    *i += 1;
+    println!("Literal: {:?}", lit);
+    Some(Node::Expr(Expr::Literal(lit.clone())))
 }
 
 #[derive(Debug)]
@@ -229,7 +314,7 @@ pub enum Type {
     Slice {
         type_: Box<Type>,
     },
-    FunctionPointers {
+    FunctionPointer {
         args: Vec<Type>,
         return_type: Box<Type>,
     },

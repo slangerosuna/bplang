@@ -10,7 +10,7 @@ fn main() {
         "b" => {
             let contents = fs::read_to_string(args[2].clone());
             let tokens = lexer::lex(contents.unwrap()).expect("failed to lex file");
-            println!("{:?}", tokens);
+            //println!("{:?}", tokens);
             
             let ast = syntax_tree_gen::gen_ast(tokens);
 

@@ -129,6 +129,7 @@ pub fn lex(input: String) -> Option<Vec<Token>> {
     let mut tokens = Vec::new();
     let mut map = HashMap::new();
 
+    //TODO make the map not be created at runtime
     map.insert("assert", Token::Keyword(Keyword::Assert));
     map.insert("fn", Token::Keyword(Keyword::FN));
     map.insert("let", Token::Keyword(Keyword::Let));
@@ -139,7 +140,7 @@ pub fn lex(input: String) -> Option<Vec<Token>> {
     map.insert("else", Token::Keyword(Keyword::Else));
     map.insert("for", Token::Keyword(Keyword::For));
     map.insert("while", Token::Keyword(Keyword::While));
-    map.insert("match", Token::Keyword(Keyword::Match));  //TODO later
+    map.insert("match", Token::Keyword(Keyword::Match)); 
     map.insert("loop", Token::Keyword(Keyword::Loop));
     map.insert("break", Token::Keyword(Keyword::Break));
     map.insert("continue", Token::Keyword(Keyword::Continue));
@@ -167,6 +168,7 @@ pub fn lex(input: String) -> Option<Vec<Token>> {
     map.insert("alloc", Token::Keyword(Keyword::Alloc));
     map.insert("as", Token::Keyword(Keyword::As));
     map.insert("in", Token::Keyword(Keyword::In));
+    map.insert("not", Token::Operator(Operator::Not));
     map.insert("and", Token::Operator(Operator::And));
     map.insert("or", Token::Operator(Operator::Or));
     map.insert("xor", Token::Operator(Operator::Xor));
