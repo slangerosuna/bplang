@@ -82,7 +82,7 @@ fn get_fn_node(
                 _ => panic!("Expected colon after fn arguments"),
             }
         },
-        _ => panic!("Expected colon after fn arguments"),
+        _ => Type::Infer,
     };
 
     *i += 1;
@@ -288,48 +288,54 @@ pub enum Expr {
     Union {
         //TODO
     },
-    VectorLiteral {
+    VectorLiteral { //formatted: |x, y, z|
         exprs: Vec<Expr>,
     },
-    MatrixLiteral {
+    MatrixLiteral { //formatted: |00, 01, 02,, //type annotation is optional
+                    //            10, 11, 12,,
+                    //            20, 21, 22|
         exprs: Vec<Expr>,
     },
-    SliceLiteral {
+    SliceLiteral { //formatted: [0, 1, 2, 3, 4, 5]
         exprs: Vec<Expr>,
     },
-    TupleLiteral {
+    TupleLiteral { //formatted: (0, 1: u32, 2, 3, 4, 5: i32) type annotation is optional
         exprs: Vec<Expr>,
     },
-    StructLiteral {
+    StructLiteral { //formatted: {x = 0, y: i32 = 1, z: i32 = 2} type annotation is optional
         //TODO
     },
-    UnionLiteral {
+    UnionLiteral { //formatted: union {x: u32 = 0, y: f32, z: i32} type annotation is required
         //TODO
+    },
+    Match {
+        expr: Box<Expr>,
+        arms: Vec<(Expr /*what value to go down the arm*/, Scope)>,
     },
 }
 
 #[derive(Debug)]
-pub enum Operation {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Mod,
-    BitAnd,
-    BitOr,
-    BitXor,
-    BitNot,
-    BitShiftLeft,
-    BitShiftRight,
-    And,
-    Or,
-    Not,
-    Equal,
-    NotEqual,
-    LessThan,
-    GreaterThan,
-    LessThanOrEqual,
-    GreaterThanOrEqual,
+pub enum Operation { //integer values are the precedence (last digit is ignored, used for discrination)
+    Add = 200,
+    Sub = 201,
+    Mul = 400,
+    Div = 401,
+    Mod = 402,
+    BitAnd = 100,
+    BitOr = 50,
+    BitXor = 51,
+    BitNot = 1000,
+    BitShiftLeft = 800,
+    BitShiftRight = 801,
+    And = 101,
+    Or = 52,
+    Not = 1001,
+    Equal = 500,
+    NotEqual = 501,
+    LessThan = 502,
+    GreaterThan = 503,
+    LessThanOrEqual = 504,
+    GreaterThanOrEqual = 505,
 }
 
 #[derive(Debug)]
@@ -418,6 +424,9 @@ pub enum Statement {
     Continue,
     Return {
         return_val: Box<Expr>,
+    },
+    UnevaluatedExpr {
+        expr: Box<Expr>,
     },
 }
 
