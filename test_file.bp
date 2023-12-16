@@ -39,10 +39,6 @@ docstrings are not required to be at the top of a file, before a function, befor
 #
 # this is designed to be similar to how rust does it
 
-fn test_func() {
-
-}
-
 "
 # This is an example docstring
 # you can put comments in docstrings and they will be ignored by the documenation generator
@@ -58,14 +54,14 @@ fn test_func() {
 	@moment: the inertia tensor of the rigid body represented as a 3x3 matrix
 }
 "
-struct RigidBody {
+" struct RigidBody {
 	pub pos: [f32; 3],
 	pub rot: [f32; 3, 3],
 	pub vel: [f32, 3],
 	pub rot_vel: [f32; 3, 3],
 	pub mass: f32,
 	pub moment: [f32; 3, 3],
-}
+} "
 
 # you can run have code outside of a function, which will run before the main function in the main file
 # or on import if it is in a different file
@@ -76,11 +72,11 @@ struct RigidBody {
 # but it is there if you want it
 #
 # for an example you can do this:
-let foo = comp |4, 4|: ![f32; 4, 4] {
+" let foo = comp |4, 4|: ![f32; 4, 4] {
 	fn execute(i: u32, j: u32) {
 		(i * j) as f32 # generates a 4x4 matrix with the value of i * j at each index (i and j are within the range 0..4, not 1..5)
 	}
-};
+}; "
 # which does everything from loading and compiling the generated file, to making heap allocations outside of a function
 # an important thing to note is that, if you configure your gpu in the main function, this will run prior to that and very well may crash your program
 # because of this, if you decide to do this for some reason, you should configure your gpu at the top of the file (before the rest of the global code)

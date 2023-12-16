@@ -6,12 +6,10 @@ pub fn gen_ast(
     let mut nodes = Vec::new();
     let mut i = 0;
 
-    loop {
-        if let Some(node) = next_node(&toks, &mut i) {
-            nodes.push(node);
-        } else {
-            break;
-        }
+    loop { 
+        if let Some(node) = next_node(&toks, &mut i)
+          { nodes.push(node); } 
+        else { break; } 
     }
 
     AbstractSyntaxTree {
@@ -23,9 +21,7 @@ fn next_node(
     toks: &Vec<Token>,
     i: &mut usize,
 ) -> Option<Node> {
-    if *i >= toks.len() {
-        return None;
-    }
+    if *i >= toks.len() { return None; }
 
     let tok = &toks[*i];
 
@@ -55,6 +51,8 @@ fn node_from_keyword (
 ) -> Option<Node> {
     match kw {
         Keyword::FN => get_fn_node(toks, i),
+        //TODO: handle other keywords
+
         _ => panic!("Unexpected keyword: {:?}", kw),
     }
 }
@@ -142,7 +140,6 @@ fn get_next_arg(
                     match del {
                         Delimiter::Colon => {
                             *i += 1;
-
                             Ok((ident.clone(), get_type(toks, i)))
                         },
                         Delimiter::Comma => {
@@ -163,13 +160,15 @@ fn get_type(
     toks: &Vec<Token>,
     i: &mut usize,
 ) -> Type {
-    *i += 1;
-
-    match &toks[*i] {
+    let res = match &toks[*i] {
         Token::Ident(ident) => Type::Ident(ident.clone()),
         Token::Primitive(type_) => Type::Primitive(type_.clone()),
         Token::Delimiter(delim) => match delim {
             Delimiter::OpenParen => get_tuple_type(toks, i),
+            Delimiter::Bang => Type::Result{
+                err: None,
+                ok: Box::new(get_type(toks, i)),
+            },
             _ => panic!("Expected type"),
         },
         Token::Keyword(kw) => match kw {
@@ -179,6 +178,17 @@ fn get_type(
         },
 
         _ => panic!("Expected type"),
+    };
+
+    match &toks[*i + 1] {
+        *i += 1;
+        Token::Delimiter(Delimiter::Bang) => {
+            Type::Result{
+                err: Some(Box::new(res)),
+                ok: Box::new(get_type(toks, i)),
+            }
+        },
+        _ => res,
     }
 }
 
@@ -326,6 +336,10 @@ pub enum Type {
     },
     Type {
         type_: Box<Type>,
+    },
+    Result {
+        err: Option<Box<Type>>,
+        ok: Box<Type>,
     },
 }
 
