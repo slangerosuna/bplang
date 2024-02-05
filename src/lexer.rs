@@ -110,7 +110,7 @@ pub enum Delimiter {
 pub enum Token {
     // Identifier
     Ident(String),
-    
+
     Literal(Literal),
 
     Primitive(Primitive),
@@ -140,7 +140,7 @@ pub fn lex(input: String) -> Option<Vec<Token>> {
     map.insert("else", Token::Keyword(Keyword::Else));
     map.insert("for", Token::Keyword(Keyword::For));
     map.insert("while", Token::Keyword(Keyword::While));
-    map.insert("match", Token::Keyword(Keyword::Match)); 
+    map.insert("match", Token::Keyword(Keyword::Match));
     map.insert("loop", Token::Keyword(Keyword::Loop));
     map.insert("break", Token::Keyword(Keyword::Break));
     map.insert("continue", Token::Keyword(Keyword::Continue));
@@ -156,7 +156,7 @@ pub fn lex(input: String) -> Option<Vec<Token>> {
     map.insert("panic", Token::Keyword(Keyword::Panic));
     map.insert("pub", Token::Keyword(Keyword::Pub));
     map.insert("priv", Token::Keyword(Keyword::Priv));
-    map.insert("true", Token::Literal(Literal::Bool(true))); 
+    map.insert("true", Token::Literal(Literal::Bool(true)));
     map.insert("false", Token::Literal(Literal::Bool(false)));
     map.insert("dyn", Token::Keyword(Keyword::Dyn));
     map.insert("struct", Token::Keyword(Keyword::Struct));
@@ -182,10 +182,10 @@ pub fn lex(input: String) -> Option<Vec<Token>> {
     map.insert("callcomp", Token::Keyword(Keyword::CallCompShader));
     map.insert("renderframe", Token::Keyword(Keyword::RenderFrame));
 
-    map.insert("u8", Token::Primitive(Primitive::U8)); 
-    map.insert("u16", Token::Primitive(Primitive::U16)); 
-    map.insert("u32", Token::Primitive(Primitive::U32)); 
-    map.insert("u64", Token::Primitive(Primitive::U64)); 
+    map.insert("u8", Token::Primitive(Primitive::U8));
+    map.insert("u16", Token::Primitive(Primitive::U16));
+    map.insert("u32", Token::Primitive(Primitive::U32));
+    map.insert("u64", Token::Primitive(Primitive::U64));
     map.insert("u128", Token::Primitive(Primitive::U128));
     map.insert("i8", Token::Primitive(Primitive::I8));
     map.insert("i16", Token::Primitive(Primitive::I16));
@@ -223,21 +223,21 @@ pub fn get_token(
 ) -> Option<Token> {
     let mut last_char;
 
-    if let Some(l_char) = input.pop() { 
-        last_char = l_char; 
-    } else { 
-        return Some(Token::EOF); 
+    if let Some(l_char) = input.pop() {
+        last_char = l_char;
+    } else {
+        return Some(Token::EOF);
     }
 
     // Skip whitespace
-    while last_char.is_whitespace() { 
-        if let Some(l_char) = input.pop() { 
-            last_char = l_char; 
-        } else { 
-            return Some(Token::EOF); 
+    while last_char.is_whitespace() {
+        if let Some(l_char) = input.pop() {
+            last_char = l_char;
+        } else {
+            return Some(Token::EOF);
         }
     }
-    
+
     if let Some(l_char) = match last_char {
         '=' => Some(Token::Operator(Operator::Equal)),
         '+' => Some(Token::Operator(Operator::Plus)),
@@ -270,12 +270,12 @@ pub fn get_token(
 
     if last_char == '#' {
         loop {
-            if let Some(l_char) = input.pop() { 
-                last_char = l_char; 
-            } else { 
-                return Some(Token::EOF); 
+            if let Some(l_char) = input.pop() {
+                last_char = l_char;
+            } else {
+                return Some(Token::EOF);
             }
-            if last_char == '\n' || last_char == '\r' 
+            if last_char == '\n' || last_char == '\r'
               { break; }
         }
 
@@ -286,12 +286,12 @@ pub fn get_token(
         let mut string = String::new();
 
         loop {
-            if let Some(l_char) = input.pop() { 
-                last_char = l_char; 
-            } else { 
+            if let Some(l_char) = input.pop() {
+                last_char = l_char;
+            } else {
                 panic!("Lexer error: unterminated string literal");
             }
-            if last_char == '"' 
+            if last_char == '"'
               { break; }
             string.push(last_char);
         }
@@ -300,14 +300,14 @@ pub fn get_token(
     }
 
     if last_char == '\'' {
-        if let Some(l_char) = input.pop() { 
-            last_char = l_char; 
-        } else { 
+        if let Some(l_char) = input.pop() {
+            last_char = l_char;
+        } else {
             panic!("Lexer error: unterminated char literal");
         }
         let l_char = last_char;
-        
-        if input.pop() != Some('\'') 
+
+        if input.pop() != Some('\'')
           { panic!("Lexer error: unterminated char literal"); }
 
         return Some(Token::Literal(Literal::Char(l_char)));
@@ -318,18 +318,18 @@ pub fn get_token(
 
         loop {
             ident.push(last_char);
-            if let Some(l_char) = input.pop() { 
-                last_char = l_char; 
-            } else { 
-                return Some(Token::EOF); 
+            if let Some(l_char) = input.pop() {
+                last_char = l_char;
+            } else {
+                return Some(Token::EOF);
             }
-            if !last_char.is_alphanumeric() && !(last_char == '_') { 
+            if !last_char.is_alphanumeric() && !(last_char == '_') {
                 input.push(last_char);
-                break; 
+                break;
             }
         }
 
-        if let Some(token) = map.get_mut(&ident[..]) 
+        if let Some(token) = map.get_mut(&ident[..])
           { return Some(token.clone()); }
 
         return Some(Token::Ident(ident));
@@ -337,35 +337,35 @@ pub fn get_token(
 
     if last_char.is_numeric() {
         let mut num = String::new();
-        
+
         let mut period_count = 0;
         loop {
             num.push(last_char);
-            if let Some(l_char) = input.pop() { 
-                last_char = l_char; 
-            } else { 
-                return Some(Token::EOF); 
+            if let Some(l_char) = input.pop() {
+                last_char = l_char;
+            } else {
+                return Some(Token::EOF);
             }
 
             //to make sure that the numbers on both sides of range initializations are parsed correctly
             if last_char == '.' {
                 period_count += 1;
-                if period_count > 1 { 
+                if period_count > 1 {
                     input.push(last_char);
                     input.push(last_char);
 
-                    break; 
+                    break;
                 }
             }
-            if !last_char.is_numeric() && !(last_char == '.') { 
+            if !last_char.is_numeric() && !(last_char == '.') {
                 input.push(last_char);
-                break; 
+                break;
             }
         }
 
         return Some(Token::Literal(Literal::Number(num.parse::<f64>().ok()?)));
     }
-    
+
     println!("{}", last_char);
     panic!("Lexer error: invalid token");
-}   
+}

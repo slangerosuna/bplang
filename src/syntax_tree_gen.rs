@@ -6,10 +6,10 @@ pub fn gen_ast(
     let mut nodes = Vec::new();
     let mut i = 0;
 
-    loop { 
+    loop {
         if let Some(node) = next_node(&toks, &mut i)
-          { nodes.push(node); } 
-        else { break; } 
+          { nodes.push(node); }
+        else { break; }
     }
 
     AbstractSyntaxTree {
@@ -30,7 +30,7 @@ fn next_node(
         Token::Keyword(kw) => node_from_keyword(toks, i, kw),
         Token::Operator(op) => node_from_operator(toks, i, op),
         Token::Delimiter(del) => node_from_delimiter(toks, i, del),
-        Token::Literal(lit) => node_from_literal(toks, i, lit),       
+        Token::Literal(lit) => node_from_literal(toks, i, lit),
 
         _ => panic!("Unexpected token: {:?}", tok),
     }
@@ -181,8 +181,8 @@ fn get_type(
     };
 
     match &toks[*i + 1] {
-        *i += 1;
         Token::Delimiter(Delimiter::Bang) => {
+            *i += 1;
             Type::Result{
                 err: Some(Box::new(res)),
                 ok: Box::new(get_type(toks, i)),
@@ -295,6 +295,7 @@ pub struct AbstractSyntaxTree {
     nodes: Vec<Node>,
 }
 
+//TODO add lifetimes and mutability as part of types
 #[derive(Debug)]
 pub enum Type {
     Infer, //The type needs to be inferred by the semantic analyzer
@@ -413,8 +414,8 @@ pub enum Expr {
     },
 }
 
-#[derive(Debug)]
-pub enum Operation { //integer values are the precedence (last digit is ignored, used for discrination)
+#[derive(Debug, Copy, Clone)]
+pub enum Operation { //integer values are the precedence (last digit is ignored, used for discrimination)
     Add = 200,
     Sub = 201,
     Mul = 400,
@@ -435,6 +436,10 @@ pub enum Operation { //integer values are the precedence (last digit is ignored,
     GreaterThan = 503,
     LessThanOrEqual = 504,
     GreaterThanOrEqual = 505,
+}
+
+impl Operation {
+    fn get_precedence(self) -> u16 { self as u16 / 10 }
 }
 
 #[derive(Debug)]
@@ -491,7 +496,7 @@ pub enum Statement {
     Union {
         //TODO
     },
-    
+
     //Control Flow
     Loop {
         scope: Box<Scope>,
