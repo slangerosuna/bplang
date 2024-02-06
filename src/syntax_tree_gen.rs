@@ -13,7 +13,7 @@ pub fn gen_ast(
     }
 
     AbstractSyntaxTree {
-        nodes: nodes,
+        nodes,
     }
 }
 
@@ -66,7 +66,7 @@ fn get_fn_node(
         Token::Ident(ident) => ident,
         _ => panic!("Expected identifier after fn keyword"),
     };
-    
+
     *i += 1;
     let args = get_fn_args(toks, i);
     *i += 1;
