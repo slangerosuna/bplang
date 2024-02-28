@@ -46,6 +46,7 @@ pub enum Keyword {
     Alloc,
     As,
     In,
+    Null,
     LDCompShader,
     LDGeomShader,
     LDVertShader,
@@ -176,6 +177,7 @@ pub fn lex(input: String) -> Option<Vec<Token>> {
     map.insert("geom", Token::Keyword(Keyword::LDGeomShader));
     map.insert("vert", Token::Keyword(Keyword::LDVertShader));
     map.insert("frag", Token::Keyword(Keyword::LDFragShader));
+    map.insert("null", Token::Keyword(Keyword::Null));
     map.insert("postproc", Token::Keyword(Keyword::LDPostProcShader));
     map.insert("pushbuffer", Token::Keyword(Keyword::LDBuffer));
     map.insert("setuniform", Token::Keyword(Keyword::LDUniform));

@@ -292,7 +292,7 @@ fn node_from_literal(
 
 #[derive(Debug)]
 pub struct AbstractSyntaxTree {
-    nodes: Vec<Node>,
+    pub nodes: Vec<Node>,
 }
 
 //TODO add lifetimes and mutability as part of types
