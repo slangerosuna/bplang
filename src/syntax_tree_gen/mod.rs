@@ -1,4 +1,4 @@
-use crate::lexer::*;
+pub use crate::lexer::*;
 
 pub fn gen_ast(
     toks: Vec<Token>,
@@ -7,14 +7,41 @@ pub fn gen_ast(
     let mut i = 0;
 
     loop {
-        if let Some(node) = next_node(&toks, &mut i)
-          { nodes.push(node); }
-        else { break; }
+        if let Some(node) = next_node(&toks, &mut i) {
+            nodes.push(node);
+        } else { break; }
     }
 
-    AbstractSyntaxTree {
-        nodes,
+    AbstractSyntaxTree { nodes, }
+}
+
+pub fn gen_ast_2(
+    toks: Vec<Token>,
+) -> AbstractSyntaxTree {
+    let mut nodes = Vec::new();
+    let mut i = 0;
+
+    || -> Option<()> {
+        loop { nodes.push(next_node(&toks, &mut i)?); }
+    }();
+
+    AbstractSyntaxTree { nodes, }
+}
+
+pub fn gen_ast_3(
+    toks: Vec<Token>,
+) -> AbstractSyntaxTree {
+    fn gen(
+        mut ast: AbstractSyntaxTree,
+        mut i: &mut usize,
+        toks: Vec<Token>,
+    ) -> AbstractSyntaxTree {
+        if let Some(node) = next_node(&toks, &mut i) {
+            ast.nodes.push(node); gen(ast, &mut i, toks)
+        } else { ast }
     }
+
+    gen(AbstractSyntaxTree { nodes: Vec::new() }, &mut 0, toks)
 }
 
 fn next_node(

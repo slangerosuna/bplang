@@ -57,14 +57,25 @@ docstrings are not required to be at the top of a file, before a function, befor
 	@moment: the inertia tensor of the rigid body represented as a 3x3 matrix
 }
 "
-" struct RigidBody {
+struct RigidBody {
 	pub pos: [f32; 3],
 	pub rot: [f32; 3, 3],
 	pub vel: [f32, 3],
 	pub rot_vel: [f32; 3, 3],
 	pub mass: f32,
 	pub moment: [f32; 3, 3],
-} "
+
+	# you can establish invariants for a struct like this:
+	assert mass > 0;
+	assert moment == moment.transpose();
+	# by doing this, you can make sure that the struct is always in a valid state
+	# if the invariants are not met, the program will panic when build in debug mode
+	#
+	# in release mode, the invariants are not checked, so the program will not panic
+	# this is done to make the program run faster
+	#
+	# one major benefit of invariants is that the compiler can use them to optimize the code
+}
 
 # there are two forms of enums: integer enums & union enums
 # integer enums look like this:
@@ -117,6 +128,7 @@ fn configure_gpu() {
 # similar result types as in Zig, uses try syntax to pull just ok types out of a result type
 # you do not typically have a docstring for the entry point of a program, but you can if you want
 fn main(): !u8 { #entry point of program
+	# you can use the `let` keyword to declare an immutable variable
 	let i: i16 = 10; #makes an immutable assignment
 	println "int: " + i;
 
@@ -205,17 +217,20 @@ fn main(): !u8 { #entry point of program
 	# or
 	# var rb: RigidBody* = alloc [f32; 22]; #allocs a 22 element array of f32s and casts it to a RigidBody
 	# or even
-	# var rb: RigidBody* = alloc 704 as usize; #allocs 704 bytes and casts it to a RigidBody
+	# var rb: RigidBody* = alloc 88; #allocs 88 bytes and casts it to a RigidBody
 	# it just allocs the memory of that size and returns a pointer to the start of it, so it's up to you to make sure that the memory is used correctly
 	# if the compiler catches you doing something wrong, it will give you a warning, but it won't stop you from doing it
 	# this can also be done with arrays and other types
 	# you can even do this:
-	# var rb: RigidBody* = alloc 1000 as usize;
-	# here, rb is a pointer to 1000 bytes of memory, but its first 704 bytes is still a RigidBody
+	# var rb: RigidBody* = alloc 1000;
+	# here, rb is a pointer to 1000 bytes of memory, but its first 88 bytes is still a RigidBody
+	# this does cause a warning, but it is not an error
+	#
+	# additionally, when you free rb, it will only free the first 88 bytes of memory, so you have to be careful with this
 
 	# if you really want to, you can do this:
-	# var rb: RigidBody = alloc 500 as usize;
-	# but this will cause a segfault if you try to access any of the fields of rb past the 500th byte
+	# var rb: RigidBody = alloc 50;
+	# but this will cause a segfault when it dereferences rb, as the pointer is not aligned to the size of RigidBody
 
 	# creates a compute shader, compiles it, and loads it onto the gpu
 	# every shader either has a return type of ![some type, n] or [!some type; n]
@@ -308,8 +323,273 @@ fn main(): !u8 { #entry point of program
 # on top of this, this means that the function can be called at compile time, allowing for better optimization
 # whenever a function can be `const`, it should be, as it allows for better optimization
 # because of this, the compiler will warn you if a function can be `const` but isn't
+
 const fn other_func(param: i16): f32 {
 	return param as f32; #casts param to 32-bit float
+}
+
+# often times, there may be identities that can be used to optimize a function that a compiler may not be able to figure out
+# because of this, there is the `-identities` flag that can be used to tell the compiler to use identities to optimize the function
+# here is an example:
+
+# here, even with the `-identities` flag, the compiler will not be able to figure out that the result of this function is always 0 unless param is 1
+# but, in more complex functions, the compiler may not be able to figure out that the result is always 0 unless param is 1, which is why the `-identities` flag is useful
+# also, the `-identities` flag here would allow for the compiler to only actually call foo when it doesn't know the value of param
+#
+# if the function was not pure, the compiler wouldn't be able to completely optimize it out, as the function could have side effects
+-identities {
+	(param != 1) -> 0; # no matter what, if param is 0, the result will be 0
+	(param == 1) -> panics; # no matter what, if param is 1, the result will be a panic, and the compiler will warn you if you try to call `foo(1)`
+}
+pure fn foo(param: i16): i16 {
+	return 0 / (param - 1);
+}
+
+# macros are used to generate code at compile time
+# they are designed to be similar to rust macros, but with a few differences
+#
+# there are three main types of macros in this language: function-like macros, function call-like macros, and attribute-like macros
+#
+# the simplest type of macro is the function-like macro
+# here is an example of a function-like macro:
+
+# here, this macro will add together all of the parameters
+macro bar {
+	# the .. represents all following parameters
+	# here, we have a recursive macro, which will add together all of the parameters
+	# by combining the first two expressions and then calling itself with the rest of the parameters
+	# there is a recursive limit of 256, so this macro would only work with 258 or fewer parameters
+	($a: expr, $b: expr, $c: ..) { bar!(($a + $b), $c) }
+	($a: expr) { $a }
+
+	# you can also have a catch-all case, which will be called if none of the other cases match
+	(..) { 0 }
+
+	# additionally, you can use differing delimiters to surround the parameters
+	# this is useful if you want to use a macro in a context where the default delimiters would cause a syntax error
+	# the allowed delimiters are (), [], {}, <>, and ||
+	[$a: expr, $b: expr, $c: ..] { bar![($a + $b), $c] }
+	[$a: expr] { $a }
+
+	[..] { 0 }
+}
+
+# here is a function call-like macro, which can exist in 2 forms
+# `fn(&[Tok]): &[Tok]` and `fn(String): &[Tok]`
+#
+# any const, non-pointer, non-reference function of the above types can be used as a function call-like macro
+#
+# if you would like to use a function as a function call-like macro, you can do this:
+# `macro_foo!([whatever you want to pass to the macro]);`
+#
+# but it can still be used as a function like this:
+# `macro_foo(toks);`
+# where toks is a slice of tokens
+
+# here, this macro will take a token slice and return a token slice
+fn macro_foo(to ks: &[Tok]): &[Tok] {
+	var tokens: Vec<Tok> = vec![];
+
+	for tok in toks {
+		tokens.push(tok);
+	}
+
+	&(*tokens)
+}
+# here, the `&(*tokens)` is used to convert the vector to a slice
+# this macro doesn't actually do anything, but it is here to show how to make a function call-like macro
+#
+# but, if you were to do something like making a DSL, you could use this to make a function call-like macro like this
+fn dsl_macro(toks: String): &[Tok] {
+	let toks = toks.split(" ") -> Vec<Tok>; # splits the string by spaces and converts it to a vector of tokens
+	let mut tokens: Vec<Tok> = vec![];
+}
+
+# because the language is designed to be good for gpu programming, it is designed to be easy to use with shaders
+# below is a simple example of a function which creates an render pipeline and uses it to render a cube
+fn render(): auto!(
+	display: std::render::Display,
+) {
+	# device would already be configured at this point
+	# if you want to configure the device, you should do it in the main function or in a dedicated function
+
+	# here we create the shaders
+
+	# shaders can take in any type with no pointers or references
+	let vertex_shader = vert { # `vert` specificies that this is a vertex shader
+		uni model: [f32; 4, 4]; # uniform variables can be passed in as parameters
+		uni view: [f32; 4, 4];
+		uni proj: [f32; 4, 4];
+
+		uni dir_light: struct {
+			dir: [f32; 3],
+			color: (f32, f32, f32),
+		};
+		uni ambient_light: (f32, f32, f32);
+
+		fn main(
+			vertex: struct {
+				pos: [f32; 3],
+				uv: [f32; 2],
+				norm: [f32; 3],
+			},
+		): struct {
+			pos: [f32; 3],
+			uv: [f32; 2],
+			light: [f32; 3],
+		} {
+			# here we transform the vertex by the model, view, and proj matrices
+			var pos = proj * view * model * |vertex.pos, 1|; # matrix multiplication is done with the * operator
+
+			# here we transform the normal by the model matrix
+			var norm = model * |vertex.norm, 0|; # matrix multiplication is done with the * operator
+
+			# here we calculate the light vector
+			var light = dir_light.dir * -1; # vector multiplication is done with the * operator
+
+			light = light * (norm * light * 2); # dot product is done with the * operator
+			light = light - norm; # vector subtraction is done with the - operator
+			light = light.multiply_elements(dir_light.color); # multiply_elements is a method of the vector type
+								          # this method will always be inlined by the compiler
+
+			light = light + ambient_light;
+
+			# here we return the transformed vertex
+			struct {
+				pos: pos,
+				uv: vertex.uv,
+				light: light,
+			}
+		}
+	} (
+		model,
+		view,
+		proj,
+		dir_light,
+		ambient_light,
+	);
+
+	# here we can declare the fragment shader
+	let fragment_shader = frag {
+		uni tex: std::render::Texture; # uniform variables can be passed in as parameters
+
+		fn main(
+			frag: struct {
+				pos: [f32; 3],
+				uv: [f32; 2],
+				light: [f32; 3],
+			},
+		): [f32; 4] {
+			# here we sample the texture
+			var color = tex.sample(frag.uv); # sample is a method of the texture type
+
+			# here we calculate the light
+			color = color.multiply_elements(frag.light);
+
+			color
+		}
+	} (tex);
+
+	# here we create the render pipeline
+	let pipe = pipeline {
+		init: {
+			set_display(display); # sets the display
+
+			bind vertex_shader; # binds the vertex shader
+			bind fragment_shader; # binds the fragment shader
+
+			pushbuffer VERTICES: vert_buffer; # pushes the vertex buffer
+			pushbuffer INDICES: index_buffer; # pushes the index buffer
+
+			setuniform fragment_shader(tex: tex); # binds the fragment shader
+			setuniform vertex_shader(
+				dir_light: struct {
+					dir: [0.0, 0.3, 0.7].normalized(),
+					color: (0.7, 0.7, 0.7),
+				},
+				ambient_light: (0.3, 0.3, 0.3),
+			);
+		},
+
+		render_pass: {
+			clear([0.0, 0.0, 0.0, 1.0]); # clears the screen to black
+
+			setuniform vertex_shader(
+				model: std::render::model(transform),
+				view: std::render::view(camera),
+				proj: std::render::proj(display.aspect, 90.0, 0.1, 1000.0),
+			);
+
+			draw();
+			swap(); # swaps the buffers
+		}
+	} (
+		vert_buffer: &[struct { pos: [f32: 3], uv: [f32; 2], norm: [f32; 3] }],
+		index_buffer: &[u32],
+
+		# the &-st'rc is used to specify that the value after being borrowed stays on the same thread
+		# this can be used to allow both mutable and immutable borrows of the same value
+		# here, it allows use to mutate transform and camera without having to pass them in to the pipeline multiple times
+		transform: &-st struct { pos: [f32; 3], rot: [f32; 3], scale: [f32; 3] },
+		camera: &-st struct { pos: [f32; 3], rot: [f32; 3] },
+
+		tex: std::render::Texture,
+
+		display: std::render::Display,
+	);
+
+	let vert_buffer = [
+		struct { pos: [0.0, 0.0, 0.0], uv: [0.0, 0.0], norm: [0.0, 0.0, 0.0] },
+		struct { pos: [1.0, 0.0, 0.0], uv: [1.0, 0.0], norm: [1.0, 0.0, 0.0] },
+		struct { pos: [1.0, 1.0, 0.0], uv: [1.0, 1.0], norm: [1.0, 1.0, 0.0] },
+		struct { pos: [0.0, 1.0, 0.0], uv: [0.0, 1.0], norm: [0.0, 1.0, 0.0] },
+		struct { pos: [0.0, 0.0, 1.0], uv: [0.0, 0.0], norm: [0.0, 0.0, 1.0] },
+		struct { pos: [1.0, 0.0, 1.0], uv: [1.0, 0.0], norm: [1.0, 0.0, 1.0] },
+		struct { pos: [1.0, 1.0, 1.0], uv: [1.0, 1.0], norm: [1.0, 1.0, 1.0] },
+		struct { pos: [0.0, 1.0, 1.0], uv: [0.0, 1.0], norm: [0.0, 1.0, 1.0] },
+	];
+
+	let index_buffer = [
+		0, 1, 2, 2, 3, 0,
+		4, 5, 6, 6, 7, 4,
+		0, 4, 7, 7, 3, 0,
+		1, 5, 6, 6, 2, 1,
+		0, 1, 5, 5, 4, 0,
+		3, 2, 6, 6, 7, 3,
+	];
+
+	let mut transform = struct { pos: [0.0, 0.0, 0.0], rot: [0.0, 0.0, 0.0], scale: [1.0, 1.0, 1.0] };
+	let mut camera = struct { pos: [0.0, 0.0, 0.0], rot: [0.0, 0.0, 0.0] };
+
+	let tex = std::render::Texture::blank(512, 512); # creates a blank texture with a width and height of 512
+
+	# now that we have everything set up, we can start rendering the cube
+	# here we initialize the pipeline
+	let pipe = pipe(
+		vert_buffer,
+		index_buffer,
+		&-st transform,
+		&-st camera,
+		tex,
+		display,
+	);
+
+	var t = std::time::Instant::now(); # gets the current time
+	var dt = t.elapsed(); # gets the time since t
+	loop {
+		# here we need to update the transform and camera
+		# this is done in a loop to allow for the transform and camera to be updated in real time
+		transform.pos = [std::math::sin(t.seconds), 0.0, 0.0];
+		transform.rot = [0.0, t.seconds, 0.0];
+
+		camera.pos = [0.0, 0.0, -5.0];
+		camera.rot = [0.0, std::math::cos(t.seconds), 0.0];
+
+		renderframe pipe;
+
+		dt = t.elapsed();
+		t = std::time::Instant::now();
+	}
 }
 
 # other useful features of this language that weren't included earlier are:
@@ -324,10 +604,114 @@ const fn other_func(param: i16): f32 {
 #
 # tuples of the same type, ie. (f32, f32) are equivalent in memory to a slice of the elements, in this case, [f32; 2], and, because of this, you can cast between them at no cost
 #
-# another types which can be no-cost casted to and from a tuple is the\
+# another types which can be no-cost casted to and from a tuple is the
 # Anonymous Struct:
-# the syntax for creating an anonymous struct is `struct { [Field Name]: [Field Type}, ... }`, essentially the same as a normal struct, but unnamed
-# these can be used for 
+# the syntax for creating an anonymous struct type is `struct { [Field Name]: [Field Type}, ... }`, essentially the same as a normal struct, but unnamed
+# these can be used for creating types that are only used once, or for creating types that are used in a single function
+#
+# Anonymous Union:
+# the syntax for creating an anonymous union type is `union { [Field Name]: [Field Type}, ... }`, essentially the same as a normal union, but unnamed
+# these can be used for creating types that are only used once, or for creating types that are used in a single function
+#
+# Anonymous Union Enum:
+# the syntax for creating an anonymous union enum type is `enum { [Variant Name]: [Variant Type], ... }`, essentially the same as a normal union enum, but unnamed
+# these can be used for creating types that are only used once, or for creating types that are used in a single function
+#
+# Anonymous Int Enum:
+# the syntax for creating an anonymous int enum type is `enum: [Integer Type] { [Variant Name], ... }`, essentially the same as a normal int enum, but unnamed
+# these can be used for creating types that are only used once, or for creating types that are used in a single function
+#
+# Closures:
+# the syntax for closures is fn([param name]: [param type], ...): [return type] { [closure body] }
+# as it is a closure, it can capture variables from the surrounding scope, if these variables are managed by the borrow checker, the closure will take ownership of them
+# but, if you would like the closure to borrow the variables, you can use the `&` operator to borrow the variables, giving the closure a reference to the variable
+#
+# the type of a closure is `fn([param type], ...): [return type]`, where the parameters and return type are the same as the closure
+# this type can be used to store the closure in a variable, pass it as a parameter, or return it from a function
+#
+# Function References:
+# the syntax for creating an function reference type is `fn([param type], ...): [return type]`, these can be used
+# to store a function in a variable, pass it as a parameter, or return it from a function
+#
+# the syntax for turning a function into a function reference is `&[function name]`, where [function name] is the name of the function
+#
+# here, all function types are references, you can't have a function type that isn't a pointer or a reference
+#
+# Function Pointers:
+# the syntax for creating an function pointer type is `(fn([param type], ...): [return type])*`, these are
+# almost the same as optional function references, but, if you somehow find a way to make use of pointer arithmetic on function pointers, you can
+#
+# since the cast from function reference to function pointer is a no-op, the cast can be done implicitly
+#
+# if you would like to cast a function pointer to a function reference, you can do this:
+# `let foo: fn([param type], ...): [return type] = (bar as ?auto).unwrap();`
+# this will cast bar to an optional function reference, and then unwrap it, getting the function reference
+# here, the `auto` type is inferred from the type of foo, so you don't have to write it out
+# in release mode, this cast is a no-op, but in debug mode, it will check if the cast is valid
+# if the cast is invalid, it will panic
+#
+# or you can also do
+# `let foo: fn([param type], ...): [return type] = try bar;`
+# which will return a null dereference error if bar is null
+# here, it won't panic, but instead the function will return a null dereference error
+# this comes at the cost of a branch, rather than a no-op
+# but this can be useful if you are not sure if bar is null
+#
+# but if you want to, you can also do
+# ```bp
+# assert bar != null;
+# let foo: fn([param type], ...): [return type] = try bar;
+# ```
+# because assertions are only checked in debug mode, this will only check if bar is null in debug mode
+# in release mode, by establishing the invariant that bar is not null, the compiler will optimize out the check, making it a no-op
+#
+# finally, you can also do
+# `let foo: fn([param type], ...): [return type] = &(*bar);`
+#
+# Type Conversion Functions:
+# A type conversion function is a function that takes a single parameter and returns a value of a different type
+# there can only be one exposed type conversion function for any given pair of types exposed at any given time
+# wrapper types can be used to expose multiple type conversion functions for the same pair of types
+# ie: if you want to convert from a String `foo` to a struct `Bar` using JSON, you can do this:
+# `foo -> JSON -> Bar`
+# this requires that you import std::serialization::JSON
+# this is done to allow you to also have a method of converting from a String to a struct using other methods, such as XML
+# JSON is just `struct JSON(String)`, so the type conversion from String to JSON is just a no-op, but it is still a type conversion function
+# the code of said type conversion function is just `fn(String): JSON { JSON(foo) }`, which is in-lined by the compiler when it is used
+#
+# if you want to, you can also do this:
+# `foo (json_to_bar)-> Bar`
+# here, the `json_to_bar` is a function of type `fn(String): Bar`, and it is used to convert the string to a Bar
+# this allows you to do the same thing as the previous example, but with specifying the function, instead of converting to the JSON wrapper type first
+#
+# if you want to implement your own type conversion function, you can do this:
+#
+# ```bp
+# impl From<Foo> for Bar {
+# 	fn from(foo: Foo): Bar { ... }
+# }
+# ```
+#
+# here, the `From` trait is used to implement a type conversion function, but you can also use the `Into` trait to do the same thing
+# if both are implemented, the `From` trait will be used, but if only the `Into` trait is implemented, the `Into` trait will be used
+# (the choice of which to use was chosen arbitrarily, and is not based on any particular reason, if you would like this to be changed, please make an issue)
+#
+# included in the standard library are type conversion functions for all of the primitive types, as well as for all of the standard library types
+# if you would like to implement your own type conversion functions for the standard library types, you are welcome to make a pull request
+# also included in the standard library are attribute-like macros for implementing type conversion through JSON, XML, TOML, YAML, and the BPD format
+# BPD, or BluePrint Data, is a binary format that is used to save storage space and make the serialization and deserialization of data faster
+# For more information on the BPD format, you can look at the documentation for the standard library when it is released
+#
+# they all come through implementing the same `From<Serialized>` and `Into<Serialized>` traits, so it's only the one trait that needs to be implemented
+# the macros are the `-serialize` and `-deserialize` macros, and they are used to implement the `Into` and `From` traits, respectively
+# they can be used like this:
+# ```bp
+# struct Foo {
+# 	-serialize
+# 	-deserialize
+# 	...
+# }
+# ```
 
 # header files are not human written in this language as the compiler will automatically generate them
 # this is done by parsing the source code and generating a header file with all public declarations
@@ -360,7 +744,8 @@ const fn other_func(param: i16): f32 {
 # beyond this, the bp cli will have a standard build system and package manager inspired by cargo
 #
 # to publish a library, you can run the following command:
-# `bp publish -a [address of the git repository] -n [name of library] -v [version number]`
+# `bp publish -a [address of the git repository] -b [branch to publish (defaults to main)] -n [name of library] -v [version number]`
+# this will make the package manager register the library with the given version number and add the git repository as a source for the library
 #
 # to add a library to your project, you can run the following command:
 # `bp add -n [name of library] -v [version number]`

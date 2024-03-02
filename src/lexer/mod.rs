@@ -3,6 +3,7 @@ use std::collections::HashMap;
 #[derive(PartialEq, Clone, Debug)]
 pub enum Literal {
     Number(f64),
+    TypedNumber(f64, Primitive),
     Str(String),
     Char(char),
     Bool(bool),
@@ -10,52 +11,61 @@ pub enum Literal {
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Keyword {
-    Assert,
-    Struct,
-    Union,
-    Dyn,
-    Interface,
-    Impl,
-    FN,
-    Let,
-    Var,
-    Extern,
-    Import,
-    If,
-    Else,
-    Match,
-    For,
-    While,
-    Break,
-    Continue,
-    Loop,
-    Return,
-    Print,
-    Println,
-    PrintErr,
-    PrintlnErr,
-    Tabiffy,
-    Error,
-    Try,
-    Catch,
-    Panic,
-    Pub,
-    Priv,
-    Defer,
-    Free,
-    Alloc,
-    As,
-    In,
-    Null,
-    LDCompShader,
-    LDGeomShader,
-    LDVertShader,
-    LDFragShader,
-    LDPostProcShader,
-    LDBuffer,
-    LDUniform,
-    CallCompShader,
-    RenderFrame,
+    Auto, // auto (inferred type or part of algebraic data type)
+    Const, // const (can be evaluated at compile time)
+    Pure, // pure (all data is immutable)
+    Async, // async (can be awaited)
+    Await, // await (waits for async function to finish)
+    Assert, // assert (panics if condition is false in debug mode; establishes an invariant in release mode)
+    Struct, // struct
+    Union, // union
+    Dyn, // dyn (dynamic type)
+    Interface, // interface (trait)
+    Impl, // impl (implement traits, methods, and associated functions)
+    FN, // fn
+    Let, // let (immutable)
+    Var, // var (mutable)
+    Extern, // extern (import from other languages)
+    Import, // import (import from other files)
+    Use, // use (exposes traits, methods, and associated functions)
+    If, // if (conditional expression)
+    Else, // else (conditional expression)
+    Match, // match (pattern matching)
+    For, // for (loop through an iterator, or c-style for loop)
+    While, // while (loop through a condition)
+    Break, // break
+    Continue, // continue
+    Loop, // loop (infinite loop, equivalent to while(true), exited with break or return)
+    Return, // return
+    Print, // print
+    Println, // println
+    PrintErr, // printerr
+    PrintlnErr, // printlnerr
+    Tabiffy, // tabiffy (increase the global indentation level on the next line)
+    Error, // error
+    Try, // try (try to execute a block of code, catch any errors with catch like C or CPP
+         // or return an error/none similar like in Zig)
+    Catch, // catch (catch any errors from a try block)
+    Panic, // panic (unrecoverable error)
+    Pub, // pub (public)
+    Priv, // priv (private)
+    Defer, // defer (execute a block of code after the current scope ends)
+    Free, // free (free memory)
+    Alloc, // alloc (allocate memory)
+    As, // as (type cast)
+    In, // in (used for iterating through a collection or for checking if a value is in a collection)
+    Null, // null (null pointer)
+    LDCompShader, // comp (creates a compute shader)
+    LDGeomShader, // geom (creates a geometry shader)
+    LDVertShader, // vert (creates a vertex shader)
+    LDFragShader, // frag (creates a fragment shader)
+    LDPostProcShader, // postproc (creates a post-processing shader)
+    LDBuffer, // pushbuffer (pushes a buffer to the GPU)
+    LDUniform, // setuniform (sets a uniform variable in the shader)
+    CallCompShader, // callcomp (calls a compute shader)
+    Bind, // bindshader (binds a shader to the GPU)
+    InitRenderPipeline, // pipeline (initializes a render pipeline)
+    RenderFrame, // renderframe (renders a frame using the selected render pipeline)
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -74,37 +84,45 @@ pub enum Primitive {
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Operator {
-    Equal,
-    Plus,
-    Minus,
-    Asterisk,
-    Divide,
-    Modulo,
-    LessThan,
-    GreaterThan,
-    Not,
-    And,
-    Or,
-    Xor,
-    Ampersand,
-    Caret,
+    Assignment, // =
+    Equal, // ==
+    FullEqual, // ===
+    NotEqual, // ~=
+    NotFullEqual, // ~==
+    Plus, // +
+    Minus, // -
+    Asterisk, // *
+    Divide, // /
+    Modulo, // %
+    LessThan, // <
+    GreaterThan, // >
+    LessThanOrEqual, // <=
+    GreaterThanOrEqual, // >=
+    Not, // ~
+    And, // and
+    Or, // or
+    Xor, // xor
+    Ampersand, // &
+    Caret, // ^
+    TypeConversion, // ->
 }
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Delimiter {
-    Bang,
-    Semicolon,
-    OpenCurly,
-    CloseCurly,
-    OpenParen,
-    CloseParen,
-    OpenBracket,
-    CloseBracket,
-    Pipe,
-    Dot,
-    Comma,
-    Colon,
-    QuestionMark,
+    Bang, // !
+    Semicolon, // ;
+    OpenCurly, // {
+    CloseCurly, // }
+    OpenParen, // (
+    CloseParen, // )
+    OpenBracket, // [
+    CloseBracket, // ]
+    Pipe, // |
+    Dot, // .
+    Comma, // ,
+    RowSeparator, // ,,
+    Colon, // :
+    QuestionMark, // ?
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -130,13 +148,18 @@ pub fn lex(input: String) -> Option<Vec<Token>> {
     let mut tokens = Vec::new();
     let mut map = HashMap::new();
 
-    //TODO make the map not be created at runtime
+    map.insert("auto", Token::Keyword(Keyword::Auto));
+    map.insert("const", Token::Keyword(Keyword::Const));
+    map.insert("pure", Token::Keyword(Keyword::Pure));
+    map.insert("async", Token::Keyword(Keyword::Async));
+    map.insert("await", Token::Keyword(Keyword::Await));
     map.insert("assert", Token::Keyword(Keyword::Assert));
     map.insert("fn", Token::Keyword(Keyword::FN));
     map.insert("let", Token::Keyword(Keyword::Let));
     map.insert("var", Token::Keyword(Keyword::Var));
     map.insert("extern", Token::Keyword(Keyword::Extern));
     map.insert("import", Token::Keyword(Keyword::Import));
+    map.insert("use", Token::Keyword(Keyword::Use));
     map.insert("if", Token::Keyword(Keyword::If));
     map.insert("else", Token::Keyword(Keyword::Else));
     map.insert("for", Token::Keyword(Keyword::For));
@@ -182,6 +205,8 @@ pub fn lex(input: String) -> Option<Vec<Token>> {
     map.insert("pushbuffer", Token::Keyword(Keyword::LDBuffer));
     map.insert("setuniform", Token::Keyword(Keyword::LDUniform));
     map.insert("callcomp", Token::Keyword(Keyword::CallCompShader));
+    map.insert("bind", Token::Keyword(Keyword::BindShader));
+    map.insert("pipeline", Token::Keyword(Keyword::InitRenderPipeline));
     map.insert("renderframe", Token::Keyword(Keyword::RenderFrame));
 
     map.insert("u8", Token::Primitive(Primitive::U8));
@@ -206,10 +231,52 @@ pub fn lex(input: String) -> Option<Vec<Token>> {
 
     loop {
         if let Some(token) = get_token(&mut input, &mut map) {
-            if token == Token::EOF 
+            if token == Token::EOF
               { break; }
 
             tokens.push(token);
+
+            // Check for multi-token combinations
+            match [tokens[tokens.len() - 2].clone(), tokens[tokens.len() - 1].clone()] {
+                [Token::Operator(Operator::Minus), Token::Operator(Operator::GreaterThan)] => {
+                    tokens.pop(); tokens.pop();
+                    tokens.push(Token::Operator(Operator::TypeConversion));
+                },
+                [Token::Operator(Operator::Assignment), Token::Operator(Operator::Assignment)] => {
+                    tokens.pop(); tokens.pop();
+                    tokens.push(Token::Operator(Operator::Equal));
+                },
+                [Token::Operator(Operator::LessThan), Token::Operator(Operator::Assignment)] => {
+                    tokens.pop(); tokens.pop();
+                    tokens.push(Token::Operator(Operator::LessThanOrEqual));
+                },
+                [Token::Operator(Operator::GreaterThan), Token::Operator(Operator::Assignment)] => {
+                    tokens.pop(); tokens.pop();
+                    tokens.push(Token::Operator(Operator::GreaterThanOrEqual));
+                },
+                [Token::Operator(Operator::Equal), Token::Operator(Operator::Assignment)] => {
+                    tokens.pop(); tokens.pop();
+                    tokens.push(Token::Operator(Operator::FullEqual));
+                },
+                [Token::Delimiter(Delimiter::Comma), Token::Delimiter(Delimiter::Comma)] => {
+                    tokens.pop(); tokens.pop();
+                    tokens.push(Token::Delimiter(Delimiter::RowSeparator));
+                },
+                [Token::Operator(Operator::Not), Token::Operator(Operator::Equal)] => {
+                    tokens.pop(); tokens.pop();
+                    tokens.push(Token::Operator(Operator::NotEqual));
+                },
+                [Token::Operator(Operator::NotEqual), Token::Operator(Operator::Equal)] => {
+                    tokens.pop(); tokens.pop();
+                    tokens.push(Token::Operator(Operator::NotFullEqual));
+                },
+                [Token::Literal(Literal::Number(n)), Token::Primitive(t)] => {
+                    tokens.pop(); tokens.pop();
+                    tokens.push(Token::Literal(Literal::TypedNumber(n, t)));
+                },
+                _ => {},
+            }
+
         } else {
             println!("Lexer error: invalid token");
             break;
@@ -223,13 +290,8 @@ pub fn get_token(
     mut input: &mut String,
     mut map: &mut HashMap<&str, Token>,
 ) -> Option<Token> {
-    let mut last_char;
-
-    if let Some(l_char) = input.pop() {
-        last_char = l_char;
-    } else {
-        return Some(Token::EOF);
-    }
+    let mut last_char = if let Some(l_char) = input.pop() { l_char }
+        else { return Some(Token::EOF); };
 
     // Skip whitespace
     while last_char.is_whitespace() {
@@ -240,8 +302,9 @@ pub fn get_token(
         }
     }
 
+    // Check for single-character operators and delimiters
     if let Some(l_char) = match last_char {
-        '=' => Some(Token::Operator(Operator::Equal)),
+        '=' => Some(Token::Operator(Operator::Assignment)),
         '+' => Some(Token::Operator(Operator::Plus)),
         '-' => Some(Token::Operator(Operator::Minus)),
         '*' => Some(Token::Operator(Operator::Asterisk)),
@@ -359,13 +422,16 @@ pub fn get_token(
                     break;
                 }
             }
+
+            //if the last character is not a number or a period, then we have reached the end of the number
             if !last_char.is_numeric() && !(last_char == '.') {
                 input.push(last_char);
                 break;
             }
         }
 
-        return Some(Token::Literal(Literal::Number(num.parse::<f64>().ok()?)));
+        return Some(Token::Literal(Literal::Number(num.parse::<f64>()
+                    .expect("Lexer error: invalid number literal"))));
     }
 
     println!("{}", last_char);
