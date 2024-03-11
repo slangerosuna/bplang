@@ -4,32 +4,50 @@ mod lexer;
 mod syntax_tree_gen;
 mod interpreter;
 
-fn main() {
+fn main() -> Result<(), std::io::Error> {
     let mut args: Vec<String> = std::env::args().collect();
+    if let Some(arg) = if args.len() > 1 { Some(args[1].as_str()) } else { None } {
+        match arg {
+            "b" => {
+                let path =
+                    if args.len() > 2
+                      { args[2].clone() }
+                    else {
+                        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "No file path provided"));
+                    };
+                let contents = fs::read_to_string(path)?;
+                let tokens = lexer::lex(contents)
+                    .ok_or(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Failed to lex file"))?;
 
-    match args[1].as_str() { //can crash if no args, but that's fine because i'm lazy
-        "b" => {
-            let contents = fs::read_to_string(args[2].clone());
-            let tokens = lexer::lex(contents.unwrap()).expect("failed to lex file");
-            //println!("{:?}", tokens);
+                let ast = syntax_tree_gen::gen_ast(tokens);
 
-            let ast = syntax_tree_gen::gen_ast(tokens);
+                println!("{:?}", ast);
+            }
+            "r" => {
+                let path =
+                    if args.len() > 2
+                      { args[2].clone() }
+                    else {
+                        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "No file path provided"));
+                    };
+                let contents = fs::read_to_string(path)?;
+                let tokens = lexer::lex(contents)
+                    .ok_or(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Failed to lex file"))?;
+                //println!("{:?}", tokens);
 
-            println!("{:?}", ast);
+                let ast = syntax_tree_gen::gen_ast(tokens);
+
+                println!("{:?}", ast);
+
+                interpreter::interpret(ast);
+            }
+            _ => {
+                return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, format!("Unknown command: {}", arg)));
+            }
         }
-        "r" => {
-            let contents = fs::read_to_string(args[2].clone());
-            let tokens = lexer::lex(contents.unwrap()).expect("failed to lex file");
-            //println!("{:?}", tokens);
-
-            let ast = syntax_tree_gen::gen_ast(tokens);
-
-            println!("{:?}", ast);
-
-            interpreter::interpret(ast);
-        }
-        _ => {
-            println!("Unknown command: {}", args[0]);
-        }
+    } else {
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "No command provided"));
     }
+
+    Ok(())
 }

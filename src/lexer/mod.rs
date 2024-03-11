@@ -19,6 +19,7 @@ pub enum Keyword {
     Assert, // assert (panics if condition is false in debug mode; establishes an invariant in release mode)
     Struct, // struct
     Union, // union
+    Enum, // enum
     Dyn, // dyn (dynamic type)
     Interface, // interface (trait)
     Impl, // impl (implement traits, methods, and associated functions)
@@ -63,7 +64,7 @@ pub enum Keyword {
     LDBuffer, // pushbuffer (pushes a buffer to the GPU)
     LDUniform, // setuniform (sets a uniform variable in the shader)
     CallCompShader, // callcomp (calls a compute shader)
-    Bind, // bindshader (binds a shader to the GPU)
+    BindShader, // bind(binds a shader to the GPU)
     InitRenderPipeline, // pipeline (initializes a render pipeline)
     RenderFrame, // renderframe (renders a frame using the selected render pipeline)
 }
@@ -185,6 +186,7 @@ pub fn lex(input: String) -> Option<Vec<Token>> {
     map.insert("dyn", Token::Keyword(Keyword::Dyn));
     map.insert("struct", Token::Keyword(Keyword::Struct));
     map.insert("union", Token::Keyword(Keyword::Union));
+    map.insert("enum", Token::Keyword(Keyword::Enum));
     map.insert("interface", Token::Keyword(Keyword::Interface));
     map.insert("impl", Token::Keyword(Keyword::Impl));
     map.insert("defer", Token::Keyword(Keyword::Defer));
@@ -237,44 +239,46 @@ pub fn lex(input: String) -> Option<Vec<Token>> {
             tokens.push(token);
 
             // Check for multi-token combinations
-            match [tokens[tokens.len() - 2].clone(), tokens[tokens.len() - 1].clone()] {
-                [Token::Operator(Operator::Minus), Token::Operator(Operator::GreaterThan)] => {
-                    tokens.pop(); tokens.pop();
-                    tokens.push(Token::Operator(Operator::TypeConversion));
-                },
-                [Token::Operator(Operator::Assignment), Token::Operator(Operator::Assignment)] => {
-                    tokens.pop(); tokens.pop();
-                    tokens.push(Token::Operator(Operator::Equal));
-                },
-                [Token::Operator(Operator::LessThan), Token::Operator(Operator::Assignment)] => {
-                    tokens.pop(); tokens.pop();
-                    tokens.push(Token::Operator(Operator::LessThanOrEqual));
-                },
-                [Token::Operator(Operator::GreaterThan), Token::Operator(Operator::Assignment)] => {
-                    tokens.pop(); tokens.pop();
-                    tokens.push(Token::Operator(Operator::GreaterThanOrEqual));
-                },
-                [Token::Operator(Operator::Equal), Token::Operator(Operator::Assignment)] => {
-                    tokens.pop(); tokens.pop();
-                    tokens.push(Token::Operator(Operator::FullEqual));
-                },
-                [Token::Delimiter(Delimiter::Comma), Token::Delimiter(Delimiter::Comma)] => {
-                    tokens.pop(); tokens.pop();
-                    tokens.push(Token::Delimiter(Delimiter::RowSeparator));
-                },
-                [Token::Operator(Operator::Not), Token::Operator(Operator::Equal)] => {
-                    tokens.pop(); tokens.pop();
-                    tokens.push(Token::Operator(Operator::NotEqual));
-                },
-                [Token::Operator(Operator::NotEqual), Token::Operator(Operator::Equal)] => {
-                    tokens.pop(); tokens.pop();
-                    tokens.push(Token::Operator(Operator::NotFullEqual));
-                },
-                [Token::Literal(Literal::Number(n)), Token::Primitive(t)] => {
-                    tokens.pop(); tokens.pop();
-                    tokens.push(Token::Literal(Literal::TypedNumber(n, t)));
-                },
-                _ => {},
+            if tokens.len() > 1 {
+                match [tokens[tokens.len() - 2].clone(), tokens[tokens.len() - 1].clone()] {
+                    [Token::Operator(Operator::Minus), Token::Operator(Operator::GreaterThan)] => {
+                        tokens.pop(); tokens.pop();
+                        tokens.push(Token::Operator(Operator::TypeConversion));
+                    },
+                    [Token::Operator(Operator::Assignment), Token::Operator(Operator::Assignment)] => {
+                        tokens.pop(); tokens.pop();
+                        tokens.push(Token::Operator(Operator::Equal));
+                    },
+                    [Token::Operator(Operator::LessThan), Token::Operator(Operator::Assignment)] => {
+                        tokens.pop(); tokens.pop();
+                        tokens.push(Token::Operator(Operator::LessThanOrEqual));
+                    },
+                    [Token::Operator(Operator::GreaterThan), Token::Operator(Operator::Assignment)] => {
+                        tokens.pop(); tokens.pop();
+                        tokens.push(Token::Operator(Operator::GreaterThanOrEqual));
+                    },
+                    [Token::Operator(Operator::Equal), Token::Operator(Operator::Assignment)] => {
+                        tokens.pop(); tokens.pop();
+                        tokens.push(Token::Operator(Operator::FullEqual));
+                    },
+                    [Token::Delimiter(Delimiter::Comma), Token::Delimiter(Delimiter::Comma)] => {
+                        tokens.pop(); tokens.pop();
+                        tokens.push(Token::Delimiter(Delimiter::RowSeparator));
+                    },
+                    [Token::Operator(Operator::Not), Token::Operator(Operator::Equal)] => {
+                        tokens.pop(); tokens.pop();
+                        tokens.push(Token::Operator(Operator::NotEqual));
+                    },
+                    [Token::Operator(Operator::NotEqual), Token::Operator(Operator::Equal)] => {
+                        tokens.pop(); tokens.pop();
+                        tokens.push(Token::Operator(Operator::NotFullEqual));
+                    },
+                    [Token::Literal(Literal::Number(n)), Token::Primitive(t)] => {
+                        tokens.pop(); tokens.pop();
+                        tokens.push(Token::Literal(Literal::TypedNumber(n, t)));
+                    },
+                    _ => {},
+                }
             }
 
         } else {
