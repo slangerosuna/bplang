@@ -4,12 +4,12 @@ examples:
 `negate_side_effects!`
 ```bplang
 static state: u32 = 0;
-foo :: () -> u32 {
+foo :: () -> u32 = {
 	state++;
 	state
 }
 
-main :: () {
+main :: () = {
 	let i = negate_side_effects!foo();
 	# this expands to:
 	# ```bp
@@ -31,7 +31,7 @@ main :: () {
 `-negate_side_effects`
 ```bplang
 static state: u32 = 0;
-foo :: -negate_side_effects () -> u32 {
+foo :: -negate_side_effects () -> u32 = {
 	state++;
 	state
 }
@@ -48,7 +48,7 @@ foo :: -negate_side_effects () -> u32 {
 # }
 # ```
 
-main :: () {
+main :: () = {
 	i := foo();
 	# since foo returned 1, you still get 1 as the answer
 	assert i == 1;
