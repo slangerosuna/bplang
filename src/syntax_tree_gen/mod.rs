@@ -1,35 +1,109 @@
+// does many things to satisfy the borrow checker that are not efficient
+// in the future, this will be implemented in bplang
+// in said implementation, the code will be refactored to not require these inefficient workarounds
+use std::collections::HashMap;
+
 pub use crate::lexer::*;
 
+mod type_;
+mod declaration;
+mod expr;
+mod statement;
+
+pub use self::{
+    type_::*,
+    declaration::*,
+    expr::*,
+    statement::*,
+};
+
+
+struct Queue<T> {
+    queue: Vec<T>,
+    pointer: usize,
+}
+
+impl<T> Queue<T> {
+    fn new() -> Self {
+        Self {
+            queue: Vec::new(),
+            pointer: 0,
+        }
+    }
+
+    fn queue(&mut self, item: T) {
+        self.queue.push(item);
+    }
+
+    fn dequeue<'a>(&'a mut self) -> Option<&'a T> {
+        if self.pointer < self.queue.len() {
+            let item = &self.queue[self.pointer];
+            self.pointer += 1;
+            Some(item)
+        } else {
+            None
+        }
+    }
+
+    fn map_some_remaining(
+        &mut self,
+        f: impl Fn(&T) -> Option<T>,
+    ) {
+        for i in self.pointer..self.queue.len() {
+            if let Some(new_item) = f(&self.queue[i])
+              { self.queue[i] = new_item; }
+        }
+    }
+
+    fn new_from_map_remaining(
+        &self,
+        f: impl Fn(&T) -> T,
+    ) -> Self {
+        Queue {
+            queue: self.queue[self.pointer..].iter().map(f).collect(),
+            pointer: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AbstractSyntaxTree {
+    pub declr: HashMap<String, Declaration>,
+    pub nodes: Vec<Node>,
+}
 pub fn gen_ast(
     toks: Vec<Token>,
 ) -> AbstractSyntaxTree {
-    AbstractSyntaxTree { nodes: Generator { toks, i: 0 }.collect() }
+    let mut declr = HashMap::new();
+    AbstractSyntaxTree { nodes: Generator { declr: &mut declr, toks, i: 0 }.collect(), declr }
 }
 
-struct Generator {
+struct Generator<'a> {
+    declr: &'a mut HashMap<String, Declaration>,
     toks: Vec<Token>,
     i: usize,
 }
 
-impl Iterator for Generator {
+impl Iterator for Generator<'_> {
     type Item = Node;
 
     fn next(&mut self) -> Option<Self::Item> {
-        next_node(&self.toks, &mut self.i)
+        next_node(&self.toks, &mut self.i, self.declr)
     }
 }
 
 fn next_node(
     toks: &Vec<Token>,
     i: &mut usize,
+    declr: &mut HashMap<String, Declaration>,
 ) -> Option<Node> {
     if *i >= toks.len() { return None; }
 
     let tok = &toks[*i];
 
     match tok {
-        Token::Ident(ident) => node_from_ident(toks, i, ident),
-        Token::Keyword(kw) => node_from_keyword(toks, i, kw),
+        Token::Ident(ident) => node_from_ident(toks, i, declr, ident),
+        Token::Keyword(kw) => node_from_keyword(toks, i, declr, kw),
         Token::Operator(op) => node_from_operator(toks, i, op),
         Token::Delimiter(del) => node_from_delimiter(toks, i, del),
         Token::Literal(lit) => node_from_literal(toks, i, lit),
@@ -41,70 +115,114 @@ fn next_node(
 fn node_from_ident(
     toks: &Vec<Token>,
     i: &mut usize,
+    declr: &mut HashMap<String, Declaration>,
     ident: &String,
 ) -> Option<Node> {
-    panic!("Not implemented");
+    *i += 1;
+    match toks[*i] {
+        Token::Delimiter(Delimiter::DoubleColon) => {
+            *i += 1;
+            match toks[*i] {
+                Token::Keyword(Keyword::Struct) => todo!(),
+                Token::Keyword(Keyword::Union) => todo!(),
+                Token::Keyword(Keyword::Enum) => todo!(),
+                Token::Keyword(Keyword::Interface) => todo!(),
+                Token::Keyword(Keyword::LDCompShader) => todo!(),
+                Token::Keyword(Keyword::LDGeomShader) => todo!(),
+                Token::Keyword(Keyword::LDVertShader) => todo!(),
+                Token::Keyword(Keyword::LDFragShader) => todo!(),
+                Token::Keyword(Keyword::LDTescShader) => todo!(),
+                Token::Keyword(Keyword::LDTeseShader) => todo!(),
+                Token::Keyword(Keyword::LDPostProcShader) => todo!(),
+                //TODO: handle compile-time args when there's `(args) =>` rather than `(args) -> return_type`
+                Token::Delimiter(Delimiter::OpenParen) => get_fn_node(toks, i, declr, ident.to_owned()),
+
+                _ => panic!("Expected identifier after double colon"),
+            }
+        },
+        Token::Operator(Operator::Assignment) => todo!(),
+        Token::Operator(Operator::Equal) => todo!(),
+        Token::Operator(Operator::FullEqual) => todo!(),
+        Token::Operator(Operator::NotEqual) => todo!(),
+        Token::Operator(Operator::NotFullEqual) => todo!(),
+        Token::Operator(Operator::LessThan) => todo!(),
+        Token::Operator(Operator::GreaterThan) => todo!(),
+        Token::Operator(Operator::LessThanOrEqual) => todo!(),
+        Token::Operator(Operator::GreaterThanOrEqual) => todo!(),
+        Token::Operator(Operator::Plus) => todo!(),
+        Token::Operator(Operator::Minus) => todo!(),
+        Token::Operator(Operator::Asterisk) => todo!(),
+        Token::Operator(Operator::Divide) => todo!(),
+        Token::Operator(Operator::Modulo) => todo!(),
+        Token::Operator(Operator::And) => todo!(),
+        Token::Operator(Operator::Or) => todo!(),
+        Token::Operator(Operator::Xor) => todo!(),
+        Token::Operator(Operator::Caret) => todo!(),
+        Token::Operator(Operator::ThinArrow) => todo!(),
+        _ => Some(Node::Expr(Expr::Ident(ident.clone()))),
+    }
 }
 
-fn node_from_keyword (
+fn handle_return_keyword(
     toks: &Vec<Token>,
     i: &mut usize,
-    kw: &Keyword,
+    declr: &mut HashMap<String, Declaration>,
 ) -> Option<Node> {
-    match kw {
-        Keyword::FN => get_fn_node(toks, i),
-        Keyword::Return => {
-            *i += 1;
-            Some(Node::Statement(Statement::Return {
-                return_val: Box::new(match next_node(toks, i).unwrap() { Node::Expr(expr) => expr, _ => panic!("expected expression")}),
-            }))
-        },
-        //TODO: handle other keywords
+    *i += 1;
+    Some(Node::Statement(Statement::Return {
+        return_val: Some(Box::new(match next_node(toks, i, declr).unwrap() { Node::Expr(expr) => expr, _ => panic!("expected expression after `return`")})),
+    }))
+}
 
+fn node_from_keyword(toks: &Vec<Token>, i: &mut usize, declr: &mut HashMap<String, Declaration>, kw: &Keyword) -> Option<Node> {
+    match kw {
+        Keyword::Return => handle_return_keyword(toks, i, declr),
+        //TODO: handle other keywords
         _ => panic!("Unexpected keyword: {:?}", kw),
     }
+}
+
+fn get_fn_node_args(toks: &Vec<Token>, i: &mut usize) -> Vec<(String, Type)> {
+    *i += 1;
+    get_fn_args(toks, i)
+}
+
+fn get_fn_node_return_type(toks: &Vec<Token>, i: &mut usize) -> Type {
+    *i += 1;
+    match &toks[*i] {
+        Token::Operator(Operator::ThinArrow) => { *i += 1; get_type(toks, i) },
+        _ => Type::Infer,
+    }
+}
+
+fn get_fn_node_scope(toks: &Vec<Token>, i: &mut usize) -> Box<Scope> {
+    *i += 1;
+    Box::new(get_scope(toks, i))
 }
 
 fn get_fn_node(
     toks: &Vec<Token>,
     i: &mut usize,
+    declr: &mut HashMap<String, Declaration>,
+    ident: String
 ) -> Option<Node> {
-    *i += 1;
-    let ident = match &toks[*i] {
-        Token::Ident(ident) => ident,
-        _ => panic!("Expected identifier after fn keyword"),
-    };
+    let args = get_fn_node_args(toks, i);
+    let return_type = get_fn_node_return_type(toks, i);
+    let scope = get_fn_node_scope(toks, i);
 
-    *i += 1;
-    let args = get_fn_args(toks, i);
-    *i += 1;
-
-    let return_type = match &toks[*i] {
-        Token::Delimiter(del) => {
-            match del {
-                Delimiter::Colon => {
-                    *i += 1;
-                    get_type(toks, i)
-                },
-                _ => Type::Infer,
-            }
-        },
-        _ => Type::Infer,
-    };
-
-    *i += 1;
-
-    let scope = Box::new(get_scope(toks, i));
-
-    Some(Node::Statement(Statement::Function {
+    let function_declaration = Declaration::Function(FunctionDeclaration {
         ident: ident.clone(),
         args,
         return_type,
         scope,
-    }))
+    });
+
+    declr.insert(ident, function_declaration.clone());
+
+    Some(Node::Statement(Statement::Declaration(function_declaration)))
 }
 
-fn get_fn_args(
+pub(self) fn get_fn_args(
     toks: &Vec<Token>,
     i: &mut usize,
 ) -> Vec<(String, Type)> {
@@ -115,224 +233,51 @@ fn get_fn_args(
 
     loop {
         match get_next_arg(toks, i) {
-            Ok((ident, type_)) => {
-                v.push((ident, type_));
-            },
-            Err(is_comma) => {
-                if is_comma { continue; } //this was a comma, so there's another arg
-                else { break; } //this was a close paren, so we're done
-            },
+            GNARes::Arg(ident, type_) => v.push((ident, type_)),
+            GNARes::Comma => continue,
+            GNARes::CloseParen => break,
         }
     }
 
     v
+}
+
+enum GNARes {
+    Arg(String, Type),
+    Comma,
+    CloseParen,
 }
 
 fn get_next_arg(
     toks: &Vec<Token>,
     i: &mut usize,
-) -> Result<(String, Type), bool> {
+) -> GNARes {
     *i += 1;
     match &toks[*i] {
-        Token::Delimiter(del) => {
-            match del {
-                Delimiter::CloseParen => Err(false),
-                Delimiter::Comma => Err(true),
-
-                _ => panic!("Expected parentheses or comma"),
-            }
-        },
+        Token::Delimiter(Delimiter::CloseParen) => GNARes::CloseParen,
+        Token::Delimiter(Delimiter::Comma) => GNARes::Comma,
         Token::Ident(ident) => {
             *i += 1;
             match &toks[*i] {
-                Token::Delimiter(del) => {
-                    match del {
-                        Delimiter::Colon => {
-                            *i += 1;
-                            Ok((ident.clone(), get_type(toks, i)))
-                        },
-                        Delimiter::Comma => {
-                            Ok((ident.clone(), Type::Infer))
-                        },
-                        _ => panic!("Expected parentheses or comma"),
-                    }
+                Token::Delimiter(Delimiter::Colon) => {
+                    *i += 1;
+                    GNARes::Arg(ident.clone(), get_type(toks, i))
                 },
-                _ => panic!("Expected identifier"),
+                Token::Delimiter(Delimiter::Comma) => GNARes::Arg(ident.clone(), Type::Infer),
+            _ => panic!("Expected colon or comma following identifier"),
             }
 
         },
-        _ => panic!("Expected identifier"),
-    }
-}
-
-fn get_type(
-    toks: &Vec<Token>,
-    i: &mut usize,
-) -> Type {
-    let res = match &toks[*i] {
-        Token::Ident(ident) => Type::Ident(ident.clone()),
-        Token::Primitive(type_) => Type::Primitive(type_.clone()),
-        Token::Delimiter(delim) => match delim {
-            Delimiter::OpenParen => get_tuple_type(toks, i),
-            Delimiter::Bang => Type::Result{
-                err: None,
-                ok: { *i += 1; Box::new(get_type(toks, i)) },
-            },
-            Delimiter::QuestionMark => Type::Optional {
-                type_: Box::new(get_type(toks, i)),
-            },
-            _ => panic!("Expected type, found delimiter: {:?}", delim),
-        },
-        Token::Keyword(kw) => match kw {
-            Keyword::FN => get_fn_type(toks, i),
-            Keyword::Struct => Type::Struct {
-                fields: get_names_and_types(toks, i)
-                        .into_iter().map(|(name, type_)|
-                            (name, type_.unwrap_or(Type::Infer)))
-                        .collect()
-            },
-            Keyword::Union => Type::Union {
-                variants: get_names_and_types(toks, i)
-                        .into_iter().map(|(name, type_)|
-                            (name, type_.unwrap_or(Type::Infer)))
-                        .collect()
-            },
-            Keyword::Enum => Type::Enum {
-                variants: get_names_and_types(toks, i),
-            },
-            _ => panic!("Expected type, found keyword: {:?}", kw),
-        },
-
-        _ => panic!("Expected type, found: {:?}", toks[*i]),
-    };
-
-    match &toks[*i + 1] {
-        Token::Delimiter(Delimiter::Bang) => {
-            *i += 1;
-            Type::Result{
-                err: Some(Box::new(res)),
-                ok: Box::new(get_type(toks, i)),
-            }
-        },
-        Token::Delimiter(Delimiter::Pipe) => {
-            *i += 2;
-
-            let next_type = get_type(toks, i);
-            match next_type {
-                Type::AnonSum { variants, .. } => Type::AnonSum {
-                    variants: { let mut v = vec![res]; v.extend(variants); v }
-                },
-                _ => Type::AnonSum {
-                    variants: vec![res, next_type],
-                },
-            }
-        },
-        Token::Operator(Operator::Ampersand) => {
-            *i += 2;
-
-            let next_type = get_type(toks, i);
-            match next_type {
-                Type::AnonProduct { fields, .. } => Type::AnonProduct {
-                    fields: { let mut v = vec![res]; v.extend(fields); v }
-                },
-                _ => Type::AnonProduct {
-                    fields: vec![res, next_type],
-                },
-            }
-        },
-        _ => res,
-    }
-}
-
-fn get_names_and_types(
-    toks: &Vec<Token>,
-    i: &mut usize,
-) -> Vec<(String, Option<Type>)> {
-    let mut v = Vec::new();
-    *i += 1;
-
-    assert_eq!(toks[*i], Token::Delimiter(Delimiter::OpenCurly),
-               "Expected open curly after struct/union/enum keyword");
-
-    loop {
-        *i += 1;
-        match &toks[*i] {
-            Token::Delimiter(Delimiter::CloseCurly) => break,
-            Token::Delimiter(Delimiter::Comma) => continue,
-            Token::Ident(name) => {
-                *i += 1;
-                match &toks[*i] {
-                    Token::Delimiter(Delimiter::Colon) => {
-                        *i += 1;
-                        v.push((name.clone(), Some(get_type(toks, i))));
-                    },
-                    _ => v.push((name.clone(), None)),
-                }
-            },
-            _ => panic!("Expected identifier"),
-        }
-    }
-
-    v
-}
-
-fn get_tuple_type(
-    toks: &Vec<Token>,
-    i: &mut usize,
-) -> Type {
-    let mut v = Vec::new();
-
-    loop {
-        *i += 1;
-        match &toks[*i] {
-            Token::Delimiter(Delimiter::CloseParen) => break,
-            Token::Delimiter(Delimiter::Comma) => continue,
-            _ => v.push(get_type(toks, i)),
-        }
-    }
-
-    if v.is_empty() { panic!("Expected type"); }
-    if v.len() == 1 { return v[0].clone(); }
-
-    Type::Tuple{
-        types: v,
-    }
-}
-
-fn get_fn_type(
-    toks: &Vec<Token>,
-    i: &mut usize,
-) -> Type {
-    *i += 1;
-
-    let args = get_fn_args(toks, i);
-    let args = args.into_iter().map(|(_, type_)| type_).collect();
-    *i += 1;
-
-    let return_type = match &toks[*i] {
-        Token::Delimiter(del) => {
-            match del {
-                Delimiter::Colon => {
-                    get_type(toks, i)
-                },
-                _ => Type::Infer,
-            }
-        },
-        _ => Type::Infer,
-    };
-    let return_type = Box::new(return_type);
-
-    Type::FunctionPointer {
-        args,
-        return_type,
+        _ => panic!("Expected identifier, comma, or close paren, found: {:?}", toks[*i]),
     }
 }
 
 fn get_statement(
     toks: &Vec<Token>,
     i: &mut usize,
+    declr: &mut HashMap<String, Declaration>,
 ) -> Option<Statement> {
-    let node = next_node(toks, i)?;
+    let node = next_node(toks, i, declr)?;
     match node {
         Node::Statement(stmnt) => Some(stmnt),
         _ => None,
@@ -343,78 +288,82 @@ fn get_scope(
     toks: &Vec<Token>,
     i: &mut usize,
 ) -> Scope {
-    match &toks[*i] {
-        Token::Delimiter(Delimiter::OpenCurly) => {
-            *i += 1;
-            let mut nodes = Vec::new();
-            let mut defered_statements = Vec::new();
+    assert_eq!(toks[*i], Token::Delimiter(Delimiter::OpenCurly),
+               "Expected open curly after scope keyword");
+    let mut declr = HashMap::new();
 
-            loop {
-                match &toks[*i] {
-                    Token::Delimiter(Delimiter::CloseCurly) => { *i += 1; break; },
-                    _ => {
-                        match &toks[*i] {
-                            Token::Keyword(kw) => {
-                                match kw {
-                                    Keyword::Defer => { *i += 1; defered_statements.push((nodes.len() - 1,get_statement(toks, i).unwrap()));},
-                                    _ => nodes.push(node_from_keyword(toks, i, kw).unwrap()),
-                                }
-                            },
-                            Token::Ident(ident) => {
-                                if let Some(node) = node_from_ident(toks, i, ident) {
-                                    nodes.push(node);
-                                }
-                            },
-                            Token::Operator(op) => {
-                                if let Some(node) = node_from_operator(toks, i, op) {
-                                    nodes.push(node);
-                                }
-                            },
-                            Token::Delimiter(del) => {
-                                if let Some(node) = node_from_delimiter(toks, i, del) {
-                                    nodes.push(node);
-                                }
-                            },
-                            Token::Literal(lit) => {
-                                if let Some(node) = node_from_literal(toks, i, lit) {
-                                    nodes.push(node);
-                                }
-                            },
-                            _ => panic!("Unexpected token: {:?}", toks[*i]),
-                        }
-                    },
-                }
+    *i += 1;
+
+    let nodes = get_scope_nodes(toks, i, &mut declr);
+    let type_ = nodes[nodes.len() - 1].type_().clone();
+
+    Scope {
+        nodes,
+        declr,
+        type_,
+    }
+}
+
+fn get_scope_nodes(
+    toks: &Vec<Token>,
+    i: &mut usize,
+    declr: &mut HashMap<String, Declaration>,
+) -> Vec<Node> {
+    let mut nodes = Vec::new();
+    let mut defered_statements = Queue::new();
+
+    loop {
+        match &toks[*i] {
+            Token::Delimiter(Delimiter::CloseCurly) => { *i += 1; break; },
+            Token::Keyword(Keyword::Defer) => { *i += 1; defered_statements.queue((nodes.len() - 1,get_statement(toks, i, declr).unwrap()));},
+            _ => { nodes.push(node_from_keyword(toks, i, declr, &Keyword::Return).unwrap()); },
+        }
+    }
+
+    apply_defered_statements(&mut nodes, defered_statements);
+
+    nodes
+}
+
+fn apply_defered_statements(
+    nodes: &mut Vec<Node>,
+    mut defered_statements: Queue<(usize, Statement)>,
+) {
+    while let Some((index, statement)) = defered_statements.dequeue() {
+        let mut i = *index;
+        // allows for the mutable borrow of defered_statements to be dropped
+        let statement = statement.clone();
+        while i < nodes.len() {
+            match &nodes[i] {
+                Node::Statement(Statement::Return { .. }) => nodes.insert(i, Node::Statement(statement.clone() )),
+                _ => {
+                    for scope in nodes[i].get_mut_scopes() {
+                        let defered_statements =
+                            // currently cloning the entire remaining queue, this will be fixed when implementing in bplang
+                            defered_statements.new_from_map_remaining(|(_, stmnt)| (0, stmnt.clone()));
+                        apply_defered_statements(&mut scope.nodes, defered_statements);
+                    }
+                    i += 1;
+                },
             }
-
-
-            let type_ = if let Some(type_) = nodes[nodes.len() - 1].type_() { type_.clone() } else { Type::Infer };
-            Scope {
-                nodes,
-                defered_statements,
-                type_
-            }
-        },
-        _ => panic!("Expected open curly"),
+        }
     }
 }
 
 fn node_from_operator(
-    toks: &Vec<Token>,
+    _toks: &Vec<Token>,
     i: &mut usize,
     op: &Operator,
 ) -> Option<Node> {
     *i += 1;
 
     match op {
-        Operator::Asterisk => { //pointer dereference
-            panic!("Not implemented"); //TODO
-        },
-        Operator::Ampersand => { //address-of
-            panic!("Not implemented"); //TODO
-        },
-        Operator::Not => { //not
-            panic!("Not implemented"); //TODO
-        }, //TODO: Verify that there are no other unary operators
+        Operator::Asterisk => todo!(), //pointer dereference
+        Operator::Ampersand => todo!(), //address-of
+        Operator::Not => todo!(), //not (logical or bitwise depending on type)
+        Operator::Minus => todo!(), // negation (ie -1)
+
+        // TODO: add support for all other unary operators
         _ => panic!("Unexpected operator: {:?}", op),
     }
 }
@@ -431,150 +380,13 @@ fn node_from_delimiter(
     }
 }
 
-#[inline]
 fn node_from_literal(
-    toks: &Vec<Token>,
+    _toks: &Vec<Token>,
     i: &mut usize,
     lit: &Literal,
 ) -> Option<Node> {
     *i += 1;
     Some(Node::Expr(Expr::Literal(lit.clone())))
-}
-
-#[derive(Debug, Clone)]
-pub struct AbstractSyntaxTree {
-    pub nodes: Vec<Node>,
-}
-
-//TODO add lifetimes and mutability as part of types
-#[derive(Debug, Clone, PartialEq)]
-pub enum Type {
-    Infer, //The type needs to be inferred by the semantic analyzer
-    Ident(String),
-    Primitive(Primitive),
-    Array {
-        type_: Box<Type>,
-        size: Box<Expr>,
-    },
-    Tuple {
-        types: Vec<Type>,
-    },
-    Struct {
-        fields: Vec<(String, Type)>,
-    },
-    Union {
-        variants: Vec<(String, Type)>,
-    },
-    Enum {
-        variants: Vec<(String, Option<Type>)>,
-    },
-    AnonSum {
-        variants: Vec<Type>,
-    },
-    AnonProduct {
-        fields: Vec<Type>,
-    },
-    Vector {
-        type_: Box<Type>,
-        size: Box<Expr>,
-    },
-    Matrix {
-        type_: Box<Type>,
-        size: Box<Expr>,
-    },
-    Slice {
-        type_: Box<Type>,
-    },
-    FunctionPointer {
-        args: Vec<Type>,
-        return_type: Box<Type>,
-    },
-    Pointer {
-        type_: Box<Type>,
-    },
-    Reference {
-        type_: Box<Type>,
-    },
-    Type {
-        type_: Box<Type>,
-    },
-    Result {
-        err: Option<Box<Type>>,
-        ok: Box<Type>,
-    },
-    Optional {
-        type_: Box<Type>,
-    },
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Expr {
-    Ident(String),
-    Literal(Literal),
-    Operation {
-        op: Operation,
-        lhs: Box<Expr>,
-        rhs: Box<Expr>,
-    },
-    Call {
-        ident: String,
-        args: Vec<Expr>,
-    },
-    Index {
-        ident: String,
-        index: Box<Expr>,
-    },
-    Member {
-        ident: String,
-        member: Box<Expr>,
-    },
-    SizeOf {
-        expr: Box<Expr>,
-    },
-    Cast {
-        expr: Box<Expr>,
-        type_: Type,
-    },
-    Type {
-        type_: Type,
-    },
-    Array {
-        type_: Type,
-        size: Box<Expr>,
-    },
-    Tuple {
-        exprs: Vec<Expr>,
-    },
-    Struct {
-        //TODO
-    },
-    Union {
-        //TODO
-    },
-    VectorLiteral { //formatted: |x, y, z|
-        exprs: Vec<Expr>,
-    },
-    MatrixLiteral { //formatted: |00, 01, 02,, //type annotation is optional
-                    //            10, 11, 12,,
-                    //            20, 21, 22|
-        exprs: Vec<Expr>,
-    },
-    SliceLiteral { //formatted: [0, 1, 2, 3, 4, 5]
-        exprs: Vec<Expr>,
-    },
-    TupleLiteral { //formatted: (0, 1: u32, 2, 3, 4, 5: i32) type annotation is optional
-        exprs: Vec<Expr>,
-    },
-    StructLiteral { //formatted: {x = 0, y: i32 = 1, z: i32 = 2} type annotation is optional
-        //TODO
-    },
-    UnionLiteral { //formatted: union {x: u32 = 0, y: f32, z: i32} type annotation is required
-        //TODO
-    },
-    Match {
-        expr: Box<Expr>,
-        arms: Vec<(Expr /*what value to go down the arm*/, Scope)>,
-    },
 }
 
 impl Literal {
@@ -589,310 +401,44 @@ impl Literal {
     }
 }
 
-impl Expr {
-    fn type_(&self) -> Type {
-        match self {
-            Expr::Ident(_) => Type::Infer,
-            Expr::Literal(lit) => lit.type_(),
-            Expr::Operation { op, lhs, rhs } => {
-                let lhs_type = lhs.type_();
-                let rhs_type = rhs.type_();
-
-                match op {
-                    Operation::Add | Operation::Sub | Operation::Mul | Operation::Div | Operation::Mod => {
-                        if lhs_type == Type::Primitive(Primitive::Str) {
-                            if rhs_type == Type::Primitive(Primitive::Str) {
-                                return Type::Primitive(Primitive::Str);
-                            }
-                        }
-                    },
-                    Operation::BitAnd | Operation::BitOr | Operation::BitXor | Operation::BitNot | Operation::BitShiftLeft | Operation::BitShiftRight => {
-                        if lhs_type == Type::Primitive(Primitive::Bool) {
-                            if rhs_type == Type::Primitive(Primitive::Bool) {
-                                return Type::Primitive(Primitive::Bool);
-                            }
-                        }
-                    },
-                    Operation::And | Operation::Or | Operation::Not => {
-                        if lhs_type == Type::Primitive(Primitive::Bool) {
-                            if rhs_type == Type::Primitive(Primitive::Bool) {
-                                return Type::Primitive(Primitive::Bool);
-                            }
-                        }
-                    },
-                    Operation::Equal | Operation::NotEqual | Operation::LessThan | Operation::GreaterThan | Operation::LessThanOrEqual | Operation::GreaterThanOrEqual => {
-                        if lhs_type == rhs_type {
-                            return Type::Primitive(Primitive::Bool);
-                        }
-                    },
-                }
-
-                Type::Infer
-            },
-            Expr::Call { ident, args } => {
-                //TODO get function's return type
-                Type::Infer
-            },
-            Expr::Index { ident, index } => {
-                //TODO get ident's type
-                Type::Infer
-            },
-            Expr::Member { ident, member } => {
-                //TODO get ident's type
-                Type::Infer
-            },
-            Expr::SizeOf { expr } => {
-                Type::Primitive(Primitive::USIZE)
-            },
-            Expr::Cast { expr, type_ } => {
-                type_.clone()
-            },
-            Expr::Type { type_ } => {
-                Type::Type { type_: Box::new(type_.clone()) }
-            },
-            Expr::Array { type_, size } => {
-                Type::Array {
-                    type_: Box::new(type_.clone()),
-                    size: size.clone(),
-                }
-            },
-            Expr::Tuple { exprs } => {
-                Type::Tuple {
-                    types: exprs.iter().map(|expr| expr.type_()).collect(),
-                }
-            },
-            Expr::Struct { .. } => {
-                //TODO
-                Type::Infer
-            },
-            Expr::Union { .. } => {
-                //TODO
-                Type::Infer
-            },
-            Expr::VectorLiteral { exprs } => {
-                Type::Vector {
-                    type_: Box::new(exprs[0].type_()),
-                    size: Box::new(Expr::Literal(Literal::Number(exprs.len() as f64))),
-                }
-            },
-            Expr::MatrixLiteral { exprs } => {
-                let size = (exprs.len() as f64).sqrt() as i64;
-                Type::Matrix {
-                    type_: Box::new(exprs[0].type_()),
-                    size: Box::new(Expr::Literal(Literal::Number(size as f64))),
-                }
-            },
-            Expr::SliceLiteral { exprs } => {
-                Type::Slice {
-                    type_: Box::new(exprs[0].type_()),
-                }
-            },
-            Expr::TupleLiteral { exprs } => {
-                Type::Tuple {
-                    types: exprs.iter().map(|expr| expr.type_()).collect(),
-                }
-            },
-            Expr::StructLiteral { .. } => {
-                //TODO
-                Type::Infer
-            },
-            Expr::UnionLiteral { .. } => {
-                //TODO
-                Type::Infer
-            },
-            Expr::Match { expr, arms } => {
-                Type::AnonSum {
-                    variants: arms.iter().map(|(expr, _)| expr.type_()).collect(),
-                }
-            },
-        }
-    }
-}
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Operation { //integer values are the precedence (last digit is ignored, used for discrimination)
-    Add = 200,
-    Sub = 201,
-    Mul = 400,
-    Div = 401,
-    Mod = 402,
-    BitAnd = 100,
-    BitOr = 50,
-    BitXor = 51,
-    BitNot = 1000,
-    BitShiftLeft = 800,
-    BitShiftRight = 801,
-    And = 101,
-    Or = 52,
-    Not = 1001,
-    Equal = 500,
-    NotEqual = 501,
-    LessThan = 502,
-    GreaterThan = 503,
-    LessThanOrEqual = 504,
-    GreaterThanOrEqual = 505,
+    Add = 0x200,
+    Sub = 0x201,
+    Mul = 0x400,
+    Div = 0x401,
+    Mod = 0x402,
+    BitAnd = 0x100,
+    BitOr = 0x50,
+    BitXor = 0x51,
+    BitNot = 0x1000,
+    BitShiftLeft = 0x800,
+    BitShiftRight = 0x801,
+    And = 0x101,
+    Or = 0x52,
+    Not = 0x1001,
+    Equal = 0x500,
+    NotEqual = 0x501,
+    LessThan = 0x502,
+    GreaterThan = 0x503,
+    LessThanOrEqual = 0x504,
+    GreaterThanOrEqual = 0x505,
 }
 
 impl Operation {
     #[inline]
-    fn get_precedence(self) -> isize { (self as isize) / 10 }
+    fn get_precedence(self) -> isize { (self as isize) & 0xFFF0 }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Statement {
-    Assert {
-        expr: Box<Expr>,
-    },
-
-    //Assignments
-    Assign {
-        ident: String,
-        expr: Box<Expr>,
-    },
-    AssignWithOp {
-        ident: String,
-        op: Operation,
-        expr: Box<Expr>,
-    },
-
-    //Declarations
-    Var {
-        ident: String,
-        expr: Box<Expr>,
-    },
-    Const {
-        ident: String,
-        expr: Box<Expr>,
-    },
-    Function {
-        ident: String,
-        args: Vec<(String, Type)>,
-        return_type: Type,
-        scope: Box<Scope>,
-    },
-    ExternFunction {
-        ident: String,
-        args: Vec<Type>,
-        return_type: Type,
-    },
-    ExternVar {
-        ident: String,
-        expr: Box<Expr>,
-    },
-    ExternConst {
-        ident: String,
-        expr: Box<Expr>,
-    },
-    ExternType {
-        ident: String,
-    },
-    Struct {
-        //TODO
-    },
-    Union {
-        //TODO
-    },
-
-    //Control Flow
-    Loop {
-        //looks like:
-        //loop { break A; break B; };
-        //evaluates to sum type of all break statements, ie. A | B
-        scope: Box<Scope>,
-    },
-    While {
-        //looks like:
-        //while condition {...};
-        //evaluates to ()
-        scope: Box<Scope>,
-        condition: Box<Expr>,
-    },
-    If {
-        //looks like:
-        //if condition {A} else {B};
-        //evaluates to A | B, and if A and B are the same type, A | B is simplified to A
-        //or
-        //if condition {A};
-        //evaluates to ?A
-        scope: Box<Scope>,
-        condition: Box<Expr>,
-        else_scope: Option<Scope>,
-    },
-    CStyleFor {
-        //TODO: add support for multiple initializers and multiple iterators
-        //
-        //looks like:
-        //for var i = 0; i < 10; i += 1 {...}
-        //evaluates to ()
-        scope: Box<Scope>,
-        declarer: Box<Statement>,
-        condition: Box<Expr>,
-        iterator: Box<Statement>,
-    },
-    IteratorFor {
-        //looks like:
-        //for i in 0..10 {A}
-        //evaluates to Iter<A, 10> (works like a map)
-        scope: Box<Scope>,
-        iterator: Box<Expr>,
-        varident: String,
-    },
-    Panic {
-        // looks like:
-        // panic "message";
-        message: Box<Expr>,
-    },
-    Break {
-        // looks like: break; or break A;
-        label: Option<String>,
-        return_val: Option<Box<Expr>>,
-    },
-    Continue, // looks like: continue;
-    Return {
-        return_val: Box<Expr>,
-    },
-    UnevaluatedExpr {
-        expr: Box<Expr>,
-    },
-}
-
-impl Statement {
-    fn type_(&self) -> Option<Type> {
-        match self {
-            Statement::Assert { .. } => None,
-            Statement::Assign { .. } => None, //TODO: return assigned variable's type
-            Statement::AssignWithOp { .. } => None, //TODO: return assigned variable's type
-            Statement::Var { .. } => None,
-            Statement::Const { .. } => None,
-            Statement::Function { .. } => None, //TODO: return function's pointer type
-            Statement::ExternFunction { .. } => None, //TODO: return function pointer type
-            Statement::ExternVar { .. } => None,
-            Statement::ExternConst { .. } => None,
-            Statement::ExternType { .. } => None, //TODO: return type's type
-            Statement::Struct { .. } => None, //TODO: return struct's type
-            Statement::Union { .. } => None, //TODO: return union's type
-            Statement::Loop { .. } => None, //TODO: return sum type of all break statements
-            Statement::While { .. } => None,
-            Statement::If { .. } => None, //TODO: return sum type of both scopes or optional of only scope
-            Statement::CStyleFor { .. } => None,
-            Statement::IteratorFor { .. } => None, //TODO: return Iter type
-            Statement::Panic { .. } => None,
-            Statement::Break { .. } => None,
-            Statement::Continue => None,
-            Statement::Return { .. } => None,
-            Statement::UnevaluatedExpr { .. } => None, //TODO: return expr's type
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Scope {
-    nodes: Vec<Node>,
-    defered_statements: Vec<(usize /*index of node where it's defered*/, Statement)>,
-    type_: Type, // the type the scope evaluates to
+    pub nodes: Vec<Node>,
+    pub declr: HashMap<String, Declaration>,
+    pub type_: Type, // the type the scope evaluates to
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Node {
     Statement(Statement),
     Expr(Expr),
@@ -900,11 +446,19 @@ pub enum Node {
 }
 
 impl Node {
-    fn type_(&self) -> Option<Type> {
+    fn type_(&self) -> Type {
         match self {
-            Node::Statement(stmnt) => stmnt.type_(),
-            Node::Expr(expr) => Some(expr.type_()),
-            Node::Scope(scope) => Some(scope.type_.clone()),
+            Node::Statement(_stmnt) => Type::None,
+            Node::Expr(expr) => expr.type_(),
+            Node::Scope(scope) => scope.type_.clone(),
+        }
+    }
+
+    fn get_mut_scopes(&mut self) -> Vec<&mut Scope> {
+        match self {
+            Node::Statement(stmnt) => stmnt.get_mut_scopes(),
+            Node::Expr(expr) => expr.get_mut_scopes(),
+            Node::Scope(scope) => vec![scope],
         }
     }
 }

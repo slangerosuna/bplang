@@ -5,7 +5,7 @@ mod syntax_tree_gen;
 mod interpreter;
 
 fn main() -> Result<(), std::io::Error> {
-    let mut args: Vec<String> = std::env::args().collect();
+    let args: Vec<String> = std::env::args().collect();
     if let Some(arg) = if args.len() > 1 { Some(args[1].as_str()) } else { None } {
         match arg {
             "b" => {

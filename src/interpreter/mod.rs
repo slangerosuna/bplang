@@ -1,6 +1,6 @@
 use crate::{
-    lexer::*,
     syntax_tree_gen::*,
+    lexer::*,
 };
 
 
@@ -40,5 +40,5 @@ struct Function {
 pub fn interpret(
     ast: AbstractSyntaxTree,
 ) {
-    let mut env = Env::new(ast);
+    let _env = Env::new(ast);
 }

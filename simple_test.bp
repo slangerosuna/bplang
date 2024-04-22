@@ -1,3 +1,130 @@
-fn main(): !u8 {
-	return 0
+vertex_shader :: vert {
+	# test comment
+    model: [f32; 4, 4];
+    rotation: [f32; 4, 4];
+    view: [f32; 4, 4];
+    proj: [f32; 4, 4];
+
+    dir_light: struct {
+        dir: [f32; 3],
+		color: [f32; 3],
+    };
+    ambient_light: [f32; 3];
+
+    main :: (
+		vertex: struct {
+			pos: [f32; 3],
+			uv: [f32; 2],
+			norm: [f32; 3],
+		},
+    ) -> struct {
+		pos: [f32; 3],
+		uv: [f32; 2],
+		light: [f32; 3],
+	} = {
+		pos := proj * view * model * [vertex.pos, 1];
+		pos := pos.xyz;
+
+		norm := rotation * [vertex.norm, 0];
+		norm := norm.xyz;
+		light := if (-dir_light * norm) > 0 { -dir_light * norm } else { 0 }; # because of lazy evaluation, `-dir_light * norm` is only evaluated once
+		light := dir_light.color * light + ambient_light;
+
+		struct {
+			pos: pos,
+			uv: vertex.uv,
+			light: light,
+		}
+    }
+}
+
+fragment_shader :: frag {
+    tex: Texture;
+
+    main :: (
+		frag: struct {
+			pos: [f32; 3],
+			uv: [f32; 2],
+			light: [f32; 3],
+		},
+    ) -> [f32; 4] = tex.sample(frag.uv).multiply_elements(frag.light);
+}
+
+object := struct {
+    vert_buffer: [ # of type [struct {pos: [f32; 3], uv: [f32; 2], norm: [f32; 3],}; 8]
+		struct { pos: [0.0, 0.0, 0.0], uv: [0.0, 0.0], norm: [0.0, 0.0, 0.0] },
+		struct { pos: [1.0, 0.0, 0.0], uv: [1.0, 0.0], norm: [1.0, 0.0, 0.0] },
+		struct { pos: [1.0, 1.0, 0.0], uv: [1.0, 1.0], norm: [1.0, 1.0, 0.0] },
+		struct { pos: [0.0, 1.0, 0.0], uv: [0.0, 1.0], norm: [0.0, 1.0, 0.0] },
+		struct { pos: [0.0, 0.0, 1.0], uv: [0.0, 0.0], norm: [0.0, 0.0, 1.0] },
+		struct { pos: [1.0, 0.0, 1.0], uv: [1.0, 0.0], norm: [1.0, 0.0, 1.0] },
+		struct { pos: [1.0, 1.0, 1.0], uv: [1.0, 1.0], norm: [1.0, 1.0, 1.0] },
+		struct { pos: [0.0, 1.0, 1.0], uv: [0.0, 1.0], norm: [0.0, 1.0, 1.0] },
+    ],
+    index_buffer: [ # of type [u32; 36]
+		0, 1, 2, 2, 3, 0,
+		4, 5, 6, 6, 7, 4,
+		0, 4, 7, 7, 3, 0,
+		1, 5, 6, 6, 2, 1,
+		0, 1, 5, 5, 4, 0,
+		3, 2, 6, 6, 7, 3,
+    ],
+}
+
+main :: () = {
+    device := get_default_render_device();
+    display := create_window(1280, 720);
+
+    device.set_display(display);
+
+    vertex_shader := vertex_shader.compile();
+    fragment_shader := fragment_shader.compile();
+
+    device.bind(vertex_shader);
+    device.bind(fragment_shader);
+
+    device.pushbuffer(VERTICES: object.vert_buffer);
+    device.pushbuffer(INDICES: object.index_buffer);
+
+    transform := struct {
+        pos: [0.0, 0.0, 0.0],
+        rot: [0.0, 0.0, 0.0],
+        scale: [1.0, 1.0, 1.0],
+    };
+    camera := struct {
+        pos: [0.0, 0.0, -5.0],
+        rot: [0.0, 0.0, 0.0],
+    };
+
+    tex := Texture::blank(512, 512);
+    fragment_shader.setuniforms(tex: tex);
+
+    vertex_shader.setuniforms(
+		dir_light: struct {
+			dir: [0.0, 0.3, 0.7].normalized(),
+			color: [0.7, 0.7, 0.7],
+		},
+        ambient_light: [0.3, 0.3, 0.3],
+    );
+
+    loop {
+		t := Instant::now().seconds();
+		transform.pos = [sin(t), 0.0, 0.0];
+		transform.rot = [t * 3, t * 5, t * 7];
+
+		camera.rot = [0.0, cos(t),0.0];
+
+		clear([0.0, 0.0, 0.0, 1.0]);
+
+		rotation := rotation(transform.rot); # defaults to yxz
+		vertex_shader.setuniforms(
+			model: model(transform.pos, rotation),
+			rotation: rotation,
+			view: view(camera.pos, camera.rot),
+			proj: proj(display.aspect, 90.0, 0.1, 1000.0),
+		);
+
+		device.draw();
+		device.swap_buffers();
+    }
 }
