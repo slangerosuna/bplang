@@ -51,8 +51,6 @@ bplang is a multi-paradigm, statically typed, compiled programming language desi
 * Async/Await
 * Standard build system and package manager
 	* All written in bplang, no MAKEFILE
-* Optional Garbage Collector
-	* Memory safety
 * Borrow checker: gives warning rather than error
 	* Thread safety
 	* Memory safety
