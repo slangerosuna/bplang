@@ -7,8 +7,6 @@ bplang is a multi-paradigm, statically typed, compiled programming language desi
 	TODO
 - Safety
 	Like Rust, bplang has a borrow checker, making bplang type safe, memory safe, and thread safe. If the rules of the borrow checker are followed, the only possible causes of panics are the `panic` keyword, the `assert` keyword, and calling functions that panic, like `(?_)::unwrap` or `f64::divide`.
-	
-	The borrow checker isn't always the perfect solution, which is why there also exist options for manual memory management or traced garbage collection.
 - Compile-time evaluation
     Just as in Jai, every function that can be evaluated at compile-time *is* evaluated at compile-time, regardless of whether or not it is preceded with a `const`. You may ask, then, why does the `const` keyword still exist in bplang, then? The answer is simple, it is there to *require* compile-time evaluation; removing the `const` keyword from a const function has no effect, but adding it to a function that cannot be evaluated at compile-time results in a compiler error.
 - Performance
